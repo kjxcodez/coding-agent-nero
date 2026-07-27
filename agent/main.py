@@ -74,7 +74,7 @@ def show_help_panel():
     help_text = (
         "[bold yellow]NERO REPL Commands:[/bold yellow]\n\n"
         "  • [bold green]<any prompt>[/bold green]          Natural language: ask questions, clone repos, request edits.\n"
-        "  • [bold green]/repo <path_or_url>[/bold green]  Switch active workspace repository.\n"
+        "  • [bold green]/repo [path_or_url][/bold green]  Show active workspace (no arg) or switch to a local/remote repo.\n"
         "  • [bold green]/context[/bold green]             Print full repository intelligence map.\n"
         "  • [bold green]/architecture[/bold green]         Show detailed architecture report (components, layers, env vars).\n"
         "  • [bold green]/routes[/bold green]              Show detected API routes in the repository.\n"
@@ -97,7 +97,7 @@ def show_help_panel():
 def start_repl_session(
     initial_request: Optional[str] = None,
     initial_repo: str = DEFAULT_REPO_URL,
-    initial_dest: str = "./target_repo",
+    initial_dest: Optional[str] = None,
     config: Optional[AgentConfig] = None,
 ):
     """Starts interactive REPL session with stateful WorkingMemory."""
@@ -108,13 +108,21 @@ def start_repl_session(
     logger = AgentLogger(verbose=True)
     logger.print_ascii_art()
 
-    current_config = config or build_config(dest=initial_dest)
-    memory = WorkingMemory(repo_path=initial_dest)
+    # Resolve workspace: prefer explicit arg, otherwise use cwd
+    cwd = os.getcwd()
+    if initial_dest is None:
+        workspace = cwd
+    else:
+        workspace = os.path.abspath(initial_dest)
+
+    current_config = config or build_config(dest=workspace)
+    current_config.repo_path = workspace
+    memory = WorkingMemory(repo_path=workspace)
     agent = AgentCore(current_config, memory, logger)
 
     console.print(Panel(
-        f"[bold yellow]Target Workspace:[/bold yellow] [bold green]{initial_dest}[/bold green]\n"
-        f"[dim]Type your prompt (e.g. 'Add tags to notes' or 'Explain how notes route works'), type [bold green]/help[/bold green] for commands.[/dim]",
+        f"[bold yellow]Working Workspace:[/bold yellow] [bold green]{workspace}[/bold green]\n"
+        f"[dim]Type your prompt, type [bold green]/help[/bold green] for all commands.[/dim]",
         border_style="cyan",
     ))
 
@@ -125,6 +133,7 @@ def start_repl_session(
         except Exception as exc:
             logger.error(f"Error processing prompt: {exc}")
 
+    # Update prompt to show current workspace
     while True:
         try:
             repo_name = os.path.basename(os.path.abspath(current_config.repo_path))
@@ -330,12 +339,23 @@ def start_repl_session(
 
                 if cmd == "/repo":
                     if not arg:
-                        console.print("[bold red]Please specify repo path or URL. Example: /repo ./my_app[/bold red]")
+                        console.print(Panel(
+                            f"[bold yellow]Current Workspace:[/bold yellow] [bold green]{os.path.abspath(current_config.repo_path)}[/bold green]\n\n"
+                            "[dim]To switch: [bold]/repo ./my-project[/bold] or [bold]/repo https://github.com/owner/repo[/bold][/dim]",
+                            title="[bold cyan]Active Workspace[/bold cyan]",
+                            border_style="cyan"
+                        ))
                         continue
-                    current_config.repo_path = arg
-                    memory.repo_path = arg
+                    resolved = os.path.abspath(arg) if not arg.startswith("http") else arg
+                    current_config.repo_path = resolved
+                    memory.repo_path = resolved
                     memory.repo_context = None
-                    console.print(f"[bold green]Target repository updated to: {arg}[/bold green]")
+                    agent = AgentCore(current_config, memory, logger)
+                    console.print(Panel(
+                        f"[bold green]✓ Workspace switched to:[/bold green] [bold cyan]{resolved}[/bold cyan]",
+                        title="[bold green]Workspace Updated[/bold green]",
+                        border_style="green"
+                    ))
                     continue
 
                 console.print(f"[bold red]Unknown slash command '{cmd}'. Type /help for available commands.[/bold red]")
@@ -362,7 +382,7 @@ def main_menu(
     ctx: typer.Context,
     request: Optional[str] = typer.Option(None, "--request", "-r", help="Optional initial change request."),
     repo: str = typer.Option(DEFAULT_REPO_URL, "--repo", help="Git repo URL or local directory path."),
-    dest: str = typer.Option("./target_repo", "--dest", "-d", help="Local destination directory."),
+    dest: Optional[str] = typer.Option(None, "--dest", "-d", help="Workspace directory. Defaults to current directory."),
 ):
     """Default entrypoint launching NERO REPL shell."""
     if ctx.invoked_subcommand is not None:
@@ -371,8 +391,9 @@ def main_menu(
     from .onboarding import run_onboarding_if_needed
     run_onboarding_if_needed()
 
-    config = build_config(dest=dest)
-    start_repl_session(initial_request=request, initial_repo=repo, initial_dest=dest, config=config)
+    resolved_dest = dest if dest is not None else os.getcwd()
+    config = build_config(dest=resolved_dest)
+    start_repl_session(initial_request=request, initial_repo=repo, initial_dest=resolved_dest, config=config)
 
 
 @app.command()

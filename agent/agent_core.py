@@ -237,16 +237,19 @@ class AgentCore:
             )
 
     def _workspace_exists(self) -> bool:
-        return os.path.isdir(os.path.abspath(self.config.repo_path))
+        """Returns True if a valid workspace directory is configured and accessible."""
+        path = os.path.abspath(self.config.repo_path)
+        # A path is valid if it exists as a directory and is accessible
+        return os.path.isdir(path)
 
     def _show_no_workspace_message(self) -> None:
         path = os.path.abspath(self.config.repo_path)
         self.logger.markdown(
             f"**No workspace found** at `{path}`\n\n"
-            "NERO needs a repository to work with. You can:\n"
+            "NERO needs a directory to work with. You can:\n"
             "  • **Clone a repo**: `clone https://github.com/owner/repo`\n"
             "  • **Switch to an existing local directory**: `/repo ./my-project`\n"
-            "  • **Start NERO with a specific path**: `nero run --dest ./my-project`\n"
+            "  • **Run NERO in a project folder directly**: `cd my-project && python -m agent.main`\n"
         )
 
     def _run_no_workspace_loop(self, user_prompt: str) -> None:

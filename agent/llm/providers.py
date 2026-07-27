@@ -3,6 +3,7 @@ Concrete LLM provider adapters for OpenAI, OpenRouter, Google Gemini, and Anthro
 """
 
 import json
+import time
 from typing import Any, Dict, List, Optional
 from openai import OpenAI
 import anthropic
@@ -445,19 +446,33 @@ class GeminiProvider(LLMProvider):
 
             # 3. Post to REST API
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={self.api_key}"
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(req_body).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST"
-            )
+            req_data = json.dumps(req_body).encode("utf-8")
             
-            try:
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    resp_data = json.loads(resp.read().decode("utf-8"))
-            except urllib.error.HTTPError as e:
-                error_body = e.read().decode("utf-8")
-                raise RuntimeError(f"Gemini Native REST API Error {e.code}: {e.reason}\n{error_body}")
+            # Retry with exponential backoff for transient 503/429 errors
+            max_retries = 4
+            last_error: Optional[Exception] = None
+            resp_data = None
+            for attempt in range(max_retries):
+                req = urllib.request.Request(
+                    url,
+                    data=req_data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                try:
+                    with urllib.request.urlopen(req, timeout=45) as resp:
+                        resp_data = json.loads(resp.read().decode("utf-8"))
+                    break  # Success — exit retry loop
+                except urllib.error.HTTPError as e:
+                    error_body = e.read().decode("utf-8")
+                    last_error = RuntimeError(f"Gemini Native REST API Error {e.code}: {e.reason}\n{error_body}")
+                    if e.code in (503, 429) and attempt < max_retries - 1:
+                        wait = 2 ** attempt  # 1s, 2s, 4s, 8s
+                        time.sleep(wait)
+                        continue
+                    raise last_error
+            if resp_data is None:
+                raise last_error or RuntimeError("Gemini REST API returned no data")
                 
             candidate = resp_data["candidates"][0]
             content_obj = candidate["content"]
