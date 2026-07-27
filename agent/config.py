@@ -28,11 +28,11 @@ def ensure_nero_dirs():
 
 # Default configuration settings
 DEFAULT_SETTINGS = {
-    "planner_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini", "openrouter/google/gemma-4-27b-it:free"],
-    "coder_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest"],
-    "verifier_models": ["google/gemini-3.5-flash-lite", "google/gemini-3.5-flash", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini"],
-    "reviewer_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o-mini"],
-    "summary_models": ["google/gemini-3.5-flash-lite", "google/gemini-3.5-flash", "openai/gpt-4o-mini"],
+    "planner_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini", "openrouter/google/gemma-4-31b-it:free", "openrouter/free"],
+    "coder_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest", "openrouter/poolside/laguna-s-2.1:free", "openrouter/free"],
+    "verifier_models": ["google/gemini-3.5-flash-lite", "google/gemini-3.5-flash", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini", "openrouter/free"],
+    "reviewer_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o-mini", "openrouter/free"],
+    "summary_models": ["google/gemini-3.5-flash-lite", "google/gemini-3.5-flash", "openai/gpt-4o-mini", "openrouter/free"],
     "repo_path": "./target_repo",
     "max_iterations": 15,
     "max_repair_attempts": 3,

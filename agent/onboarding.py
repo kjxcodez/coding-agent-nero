@@ -306,21 +306,23 @@ def run_onboarding_if_needed() -> None:
         reviewers = [model_ref, "openai/gpt-4o-mini"]
         summaries = [model_ref, "openai/gpt-4o-mini"]
     else:
-        # OpenRouter: assign real free-tier coding models
+        # OpenRouter: assign real free-tier coding models with openrouter/free as last-resort
         planners = [
             default_model,
-            "openrouter/google/gemma-4-27b-it:free",
+            "openrouter/google/gemma-4-31b-it:free",
             "openrouter/poolside/laguna-s-2.1:free",
+            "openrouter/free",
         ]
         coders = [
             default_model,
             "openrouter/poolside/laguna-m.1:free",
             "openrouter/cohere/north-mini-code:free",
-            "openrouter/google/gemma-4-27b-it:free",
+            "openrouter/google/gemma-4-31b-it:free",
+            "openrouter/free",
         ]
-        verifiers = [default_model, "openrouter/google/gemma-4-27b-it:free"]
-        reviewers = [default_model, "openrouter/poolside/laguna-s-2.1:free"]
-        summaries = [default_model, "openrouter/google/gemma-4-27b-it:free"]
+        verifiers = [default_model, "openrouter/google/gemma-4-31b-it:free", "openrouter/free"]
+        reviewers = [default_model, "openrouter/poolside/laguna-s-2.1:free", "openrouter/free"]
+        summaries = [default_model, "openrouter/google/gemma-4-31b-it:free", "openrouter/free"]
 
     settings = {
         "planner_models": planners,
