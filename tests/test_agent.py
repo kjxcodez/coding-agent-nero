@@ -44,7 +44,7 @@ class TestNEROCore(unittest.TestCase):
     def test_tool_safety_guard_path_traversal(self):
         safety = ToolSafetyGuard(self.config)
         valid = safety.resolve_and_validate_path(self.repo_path, "src/app.js")
-        self.assertTrue(valid.startswith(self.repo_path.replace("\\", "/")))
+        self.assertTrue(valid.replace("\\", "/").lower().startswith(self.repo_path.replace("\\", "/").lower()))
 
         with self.assertRaises(SecurityError):
             safety.resolve_and_validate_path(self.repo_path, "../../etc/passwd")
@@ -95,7 +95,7 @@ class TestNEROCore(unittest.TestCase):
         self.assertIn("Successfully replaced", res_replace)
         # Test clone_repo tool dispatch
         res_clone = registry.dispatch("clone_repo", {"url_or_path": self.repo_path})
-        self.assertIn("Successfully cloned/loaded", res_clone)
+        self.assertIn("Successfully loaded and resolved workspace", res_clone)
 
 
 class TestIntentRouter(unittest.TestCase):
@@ -217,7 +217,7 @@ class TestIntentRouter(unittest.TestCase):
 
     def test_search_gets_one_tool(self):
         tools = self.router.get_tool_names(Intent.SEARCH)
-        self.assertEqual(tools, ["search_code_content"])
+        self.assertEqual(tools, ["search_code_content", "search_filenames"])
 
     def test_modify_gets_all_tools(self):
         tools = self.router.get_tool_names(Intent.MODIFY)
@@ -607,6 +607,8 @@ class TestPhase5(unittest.TestCase):
                 self.messages.append(text)
             def error(self, text):
                 self.messages.append(text)
+            def log_event(self, event_type, data):
+                pass
 
         self.logger = MockLogger()
 

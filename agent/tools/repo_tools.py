@@ -6,7 +6,6 @@ from typing import Any, Dict, Optional
 from .base import BaseTool
 from .safety import ToolSafetyGuard
 from ..config import AgentConfig
-from ..agent_core import AgentCore
 from ..repo import RepositoryManager
 
 class CloneRepoTool(BaseTool):
