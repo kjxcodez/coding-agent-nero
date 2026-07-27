@@ -51,6 +51,7 @@ class RunCommandTool(BaseTool):
                 shell=True,
                 capture_output=True,
                 text=True,
+                errors="replace",
                 stdin=subprocess.DEVNULL,
                 timeout=120,
             )

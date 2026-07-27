@@ -208,6 +208,7 @@ class RepositoryScanner:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                errors="replace",
                 timeout=5,
             )
             if result.returncode == 0:

@@ -41,6 +41,7 @@ class GitDiffTool(BaseTool):
                 cwd=self.repo_root,
                 capture_output=True,
                 text=True,
+                errors="replace",
             )
             output = res.stdout.strip()
             return output if output else "(no changes detected in git diff)"
@@ -79,6 +80,7 @@ class GitStatusTool(BaseTool):
                 cwd=self.repo_root,
                 capture_output=True,
                 text=True,
+                errors="replace",
             )
             output = res.stdout.strip()
             return output if output else "(clean working tree, no modified or untracked files)"

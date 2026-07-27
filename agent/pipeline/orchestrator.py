@@ -174,6 +174,7 @@ class PipelineOrchestrator:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                errors="replace",
                 timeout=10,
             )
             diff = result.stdout.strip()
@@ -183,6 +184,7 @@ class PipelineOrchestrator:
                     cwd=repo_path,
                     capture_output=True,
                     text=True,
+                    errors="replace",
                     timeout=10,
                 )
                 diff = result2.stdout.strip()

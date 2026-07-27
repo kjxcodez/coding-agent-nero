@@ -94,6 +94,7 @@ class VerificationEngine:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                errors="replace",
             )
             for line in res.stdout.splitlines():
                 if line.strip():
@@ -106,7 +107,7 @@ class VerificationEngine:
         for f in modified_files:
             full_path = os.path.join(repo_path, f)
             if os.path.isfile(full_path):
-                proc = subprocess.run(["node", "-c", f], cwd=repo_path, capture_output=True, text=True)
+                proc = subprocess.run(["node", "-c", f], cwd=repo_path, capture_output=True, text=True, errors="replace")
                 if proc.returncode != 0:
                     return VerificationResult(
                         passed=False,
@@ -148,6 +149,7 @@ class VerificationEngine:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
+                    errors="replace",
                 )
                 time.sleep(2.0)
                 poll = proc.poll()

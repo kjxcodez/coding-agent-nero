@@ -99,8 +99,12 @@ class ReadFileTool(BaseTool):
         except Exception:
             return False
 
-    def execute(self, path: str, start_line: Optional[int] = None, end_line: Optional[int] = None, **kwargs) -> str:
+    def execute(self, path: Optional[str] = None, start_line: Optional[int] = None, end_line: Optional[int] = None, **kwargs) -> str:
         try:
+            if not path:
+                path = kwargs.get("path") or kwargs.get("filepath") or kwargs.get("file")
+            if not path:
+                raise ToolError("Missing required argument: 'path'")
             target_file = self.safety.resolve_and_validate_path(self.repo_root, path)
             if not os.path.isfile(target_file):
                 raise ToolError(f"File does not exist: {path}")
@@ -173,8 +177,18 @@ class WriteFileTool(BaseTool):
             "required": ["path", "content"],
         }
 
-    def execute(self, path: str, content: str, **kwargs) -> str:
+    def execute(self, path: Optional[str] = None, content: Optional[str] = None, **kwargs) -> str:
         try:
+            if not path:
+                path = kwargs.get("path") or kwargs.get("filepath") or kwargs.get("file")
+            if content is None:
+                content = kwargs.get("content") or kwargs.get("contents") or kwargs.get("text")
+            
+            if not path:
+                raise ToolError("Missing required argument: 'path'")
+            if content is None:
+                raise ToolError("Missing required argument: 'content'")
+                
             target_file = self.safety.resolve_and_validate_path(self.repo_root, path)
             prev_content = ""
             if os.path.isfile(target_file):
@@ -239,8 +253,16 @@ class CreateFileTool(BaseTool):
             "required": ["path", "content"],
         }
 
-    def execute(self, path: str, content: str, **kwargs) -> str:
+    def execute(self, path: Optional[str] = None, content: Optional[str] = None, **kwargs) -> str:
         try:
+            if not path:
+                path = kwargs.get("path") or kwargs.get("filepath") or kwargs.get("file")
+            if content is None:
+                content = kwargs.get("content") or kwargs.get("contents") or kwargs.get("text") or ""
+            
+            if not path:
+                raise ToolError("Missing required argument: 'path'")
+                
             target_file = self.safety.resolve_and_validate_path(self.repo_root, path)
             if os.path.exists(target_file):
                 raise ToolError(f"File already exists at '{path}'. Use write_file to overwrite.")
@@ -286,8 +308,22 @@ class ReplaceTextTool(BaseTool):
             "required": ["path", "old_text", "new_text"],
         }
 
-    def execute(self, path: str, old_text: str, new_text: str, **kwargs) -> str:
+    def execute(self, path: Optional[str] = None, old_text: Optional[str] = None, new_text: Optional[str] = None, **kwargs) -> str:
         try:
+            if not path:
+                path = kwargs.get("path") or kwargs.get("filepath") or kwargs.get("file")
+            if old_text is None:
+                old_text = kwargs.get("old_text") or kwargs.get("old") or kwargs.get("replace") or kwargs.get("target")
+            if new_text is None:
+                new_text = kwargs.get("new_text") or kwargs.get("new") or kwargs.get("with") or kwargs.get("replacement")
+                
+            if not path:
+                raise ToolError("Missing required argument: 'path'")
+            if old_text is None:
+                raise ToolError("Missing required argument: 'old_text'")
+            if new_text is None:
+                raise ToolError("Missing required argument: 'new_text'")
+                
             target_file = self.safety.resolve_and_validate_path(self.repo_root, path)
             if not os.path.isfile(target_file):
                 raise ToolError(f"File does not exist: {path}")

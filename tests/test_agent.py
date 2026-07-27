@@ -812,6 +812,36 @@ class TestPhase5(unittest.TestCase):
         is_placeholder = verifier._is_placeholder_test_suite(self.repo_path)
         self.assertFalse(is_placeholder)
 
+    def test_tool_argument_auto_healing(self):
+        registry = ToolRegistry(self.config, self.repo_path, memory=self.memory)
+
+        # Test write_file auto-healing (using contents instead of content)
+        res_write = registry.dispatch("write_file", {
+            "path": "src/app.js",
+            "contents": "console.log('auto-healed');"
+        })
+        self.assertIn("Successfully wrote", res_write)
+
+        # Verify it actually wrote the content
+        res_read = registry.dispatch("read_file", {
+            "path": "src/app.js"
+        })
+        self.assertEqual(res_read, "console.log('auto-healed');")
+
+        # Test replace_text auto-healing (using replace/with instead of old_text/new_text)
+        res_replace = registry.dispatch("replace_text", {
+            "path": "src/app.js",
+            "replace": "auto-healed",
+            "with": "fully-healed"
+        })
+        self.assertIn("Successfully replaced", res_replace)
+
+        # Verify replacement occurred
+        res_read_final = registry.dispatch("read_file", {
+            "path": "src/app.js"
+        })
+        self.assertEqual(res_read_final, "console.log('fully-healed');")
+
 
 if __name__ == "__main__":
     unittest.main()

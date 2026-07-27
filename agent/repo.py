@@ -52,10 +52,12 @@ class RepositoryManager:
 
             os.makedirs(os.path.dirname(target_dest), exist_ok=True)
             try:
-                subprocess.run(["git", "clone", source, target_dest], check=True, capture_output=True, text=True)
+                subprocess.run(["git", "clone", source, target_dest], check=True, capture_output=True, text=True, errors="replace")
                 return target_dest
             except subprocess.CalledProcessError as exc:
-                raise RepositoryError(f"Failed to clone repository {source}: {exc.stderr}") from exc
+                # Handle bytes vs str in CalledProcessError stderr
+                err_msg = exc.stderr.decode(errors="ignore") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+                raise RepositoryError(f"Failed to clone repository {source}: {err_msg}") from exc
 
         local_path = os.path.abspath(source)
         if not os.path.isdir(local_path):
@@ -71,6 +73,7 @@ class RepositoryManager:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                errors="replace",
                 check=True,
             )
             return res.stdout.strip()
@@ -93,6 +96,10 @@ class RepositoryManager:
 
         try:
             subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+            # Set dummy local credentials so git commit works even if git is unconfigured globally
+            subprocess.run(["git", "config", "user.name", "NERO Agent"], cwd=repo_path, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "nero@agent.local"], cwd=repo_path, check=True, capture_output=True)
+            
             subprocess.run(["git", "add", "-A"], cwd=repo_path, check=True, capture_output=True)
             subprocess.run(
                 ["git", "commit", "-m", "NERO Baseline Commit"],
@@ -115,6 +122,7 @@ class RepositoryManager:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                errors="replace",
             )
             out = res.stdout.strip()
             return out if out else "(no changes)"
@@ -130,6 +138,7 @@ class RepositoryManager:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
+                errors="replace",
             )
             if not res.stdout.strip():
                 return []

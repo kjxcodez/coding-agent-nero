@@ -36,6 +36,7 @@ class GitState:
                     cwd=repo_path,
                     capture_output=True,
                     text=True,
+                    errors="replace",
                     timeout=5,
                 )
                 return result.stdout.strip() if result.returncode == 0 else ""
@@ -61,6 +62,7 @@ class GitState:
                     cwd=repo_path,
                     capture_output=True,
                     text=True,
+                    errors="replace",
                     timeout=5,
                 )
                 return result.stdout.strip() if result.returncode == 0 else ""

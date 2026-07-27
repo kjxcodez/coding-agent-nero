@@ -83,15 +83,13 @@ class IncrementalPlanner:
                 raw = response.content or ""
                 plan = self._parse_plan(raw, model_used=response.model_used)
                 return plan
-            except PlannerError:
-                raise
             except Exception as exc:
                 last_error = exc
                 if attempt == 1:
                     messages.append({"role": "assistant", "content": raw})
                     messages.append({
                         "role": "user",
-                        "content": "Your response was not valid JSON. Please output ONLY the JSON plan object.",
+                        "content": f"Your response was not a valid JSON plan. Error: {exc}. Please output ONLY the valid JSON plan matching the requested schema.",
                     })
                 continue
 
