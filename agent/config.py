@@ -138,6 +138,19 @@ class AgentConfig:
         "node -v",
         "python --version",
         "python3 --version",
+        "node",
+        "npx",
+        "python",
+        "python3",
+        "jest",
+        "vitest",
+        "mocha",
+        "eslint",
+        "pip install",
+        "pip3 install",
+        "go run",
+        "go build",
+        "cargo run",
     )
 
     @classmethod

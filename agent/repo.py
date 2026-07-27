@@ -96,16 +96,21 @@ class RepositoryManager:
 
         try:
             subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
-            # Set dummy local credentials so git commit works even if git is unconfigured globally
-            subprocess.run(["git", "config", "user.name", "NERO Agent"], cwd=repo_path, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "nero@agent.local"], cwd=repo_path, check=True, capture_output=True)
-            
             subprocess.run(["git", "add", "-A"], cwd=repo_path, check=True, capture_output=True)
+            
+            # Set temporary Git environment variables to prevent commit failures if git is unconfigured globally
+            env = os.environ.copy()
+            env["GIT_AUTHOR_NAME"] = "NERO Agent"
+            env["GIT_AUTHOR_EMAIL"] = "nero@agent.local"
+            env["GIT_COMMITTER_NAME"] = "NERO Agent"
+            env["GIT_COMMITTER_EMAIL"] = "nero@agent.local"
+
             subprocess.run(
                 ["git", "commit", "-m", "NERO Baseline Commit"],
                 cwd=repo_path,
                 check=True,
                 capture_output=True,
+                env=env,
             )
         except subprocess.CalledProcessError as exc:
             stderr = exc.stderr.decode(errors="ignore") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
