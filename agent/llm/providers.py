@@ -309,15 +309,33 @@ class OpenRouterProvider(LLMProvider):
         )
 
 
+import urllib.request
+import urllib.error
+
+def convert_to_gemini_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively converts OpenAI schema types to Gemini native uppercase types."""
+    res = {}
+    for k, v in schema.items():
+        if k == "type" and isinstance(v, str):
+            res[k] = v.upper()
+        elif isinstance(v, dict):
+            res[k] = convert_to_gemini_schema(v)
+        elif isinstance(v, list):
+            res[k] = [convert_to_gemini_schema(item) if isinstance(item, dict) else item for item in v]
+        else:
+            res[k] = v
+    return res
+
+
 class GeminiProvider(LLMProvider):
-    """Direct adapter for Google Gemini API via OpenAI compatibility endpoint."""
+    """Direct adapter for Google Gemini API via native REST and OpenAI compatibility endpoint."""
 
     def __init__(self, api_key: Optional[str] = None):
-        key = api_key or GEMINI_API_KEY
-        if not key:
+        self.api_key = api_key or GEMINI_API_KEY
+        if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not set. Setup credentials via onboarding or environment.")
         self.client = OpenAI(
-            api_key=key,
+            api_key=self.api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
         )
 
@@ -333,44 +351,185 @@ class GeminiProvider(LLMProvider):
         # Strip provider prefixes if any
         clean_model = model.split("/")[-1] if "/" in model else model
 
-        # Gemini supports models like 'gemini-2.5-flash', etc.
-        kwargs: Dict[str, Any] = {
-            "model": clean_model,
-            "messages": messages,
-            "temperature": temperature,
-        }
         if tools:
-            kwargs["tools"] = tools
-            kwargs["tool_choice"] = tool_choice or "auto"
+            # 1. Convert messages to Gemini native format
+            gemini_contents = []
+            system_parts = []
+            for msg in messages:
+                if msg["role"] == "system":
+                    system_parts.append(msg["content"])
+                    continue
+                    
+                if "gemini_native_content" in msg:
+                    gemini_contents.append(msg["gemini_native_content"])
+                    continue
+                    
+                role = "user" if msg["role"] in ("user", "tool") else "model"
+                parts = []
+                
+                if msg["role"] == "assistant":
+                    if msg.get("content"):
+                        parts.append({"text": msg["content"]})
+                    if "tool_calls" in msg and msg["tool_calls"]:
+                        for tc in msg["tool_calls"]:
+                            if "functionCall" in tc:
+                                parts.append({"functionCall": tc["functionCall"]})
+                            elif "function" in tc:
+                                func_name = tc["function"]["name"]
+                                args = tc["function"]["arguments"]
+                                if isinstance(args, str):
+                                    try:
+                                        args = json.loads(args)
+                                    except Exception:
+                                        args = {}
+                                func_call = {
+                                    "name": func_name,
+                                    "args": args
+                                }
+                                if "thought_signature" in tc:
+                                    func_call["thought_signature"] = tc["thought_signature"]
+                                elif "thought_signature" in tc["function"]:
+                                    func_call["thought_signature"] = tc["function"]["thought_signature"]
+                                parts.append({"functionCall": func_call})
+                elif msg["role"] == "tool":
+                    tool_name = None
+                    for prev in messages:
+                        if prev.get("role") == "assistant" and "tool_calls" in prev:
+                            for tc in prev["tool_calls"]:
+                                if tc.get("id") == msg.get("tool_call_id"):
+                                    tool_name = tc["function"]["name"]
+                                    break
+                        if tool_name:
+                            break
+                    if not tool_name:
+                        tool_name = msg.get("name") or "default_api:clone_repo"
+                        
+                    try:
+                        resp_json = json.loads(msg["content"])
+                    except Exception:
+                        resp_json = {"output": msg["content"]}
+                    parts.append({
+                        "functionResponse": {
+                            "name": tool_name,
+                            "response": resp_json
+                        }
+                    })
+                else:
+                    parts.append({"text": msg["content"]})
+                    
+                gemini_contents.append({
+                    "role": role,
+                    "parts": parts
+                })
 
-        if stream:
-            return _stream_openai_compatible(self.client, kwargs, model)
+            # 2. Build REST body
+            req_body = {
+                "contents": gemini_contents,
+                "generationConfig": {
+                    "temperature": temperature
+                }
+            }
+            if system_parts:
+                req_body["systemInstruction"] = {"parts": [{"text": "\n\n".join(system_parts)}]}
+                
+            declarations = []
+            for tool in tools:
+                if tool.get("type") == "function":
+                    func = tool["function"]
+                    declarations.append({
+                        "name": func["name"],
+                        "description": func.get("description", ""),
+                        "parameters": convert_to_gemini_schema(func.get("parameters", {}))
+                    })
+            req_body["tools"] = [{"functionDeclarations": declarations}]
 
-        response = self.client.chat.completions.create(**kwargs)
-        msg = response.choices[0].message
-
-        tool_calls: List[ToolCall] = []
-        if msg.tool_calls:
-            for tc in msg.tool_calls:
-                try:
-                    args = json.loads(tc.function.arguments or "{}")
-                except json.JSONDecodeError:
-                    args = {}
-                tool_calls.append(
-                    ToolCall(
-                        id=tc.id,
-                        name=tc.function.name,
-                        arguments=args,
+            # 3. Post to REST API
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={self.api_key}"
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(req_body).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    resp_data = json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode("utf-8")
+                raise RuntimeError(f"Gemini Native REST API Error {e.code}: {e.reason}\n{error_body}")
+                
+            candidate = resp_data["candidates"][0]
+            content_obj = candidate["content"]
+            parts = content_obj.get("parts", [])
+            
+            content_text = ""
+            tool_calls = []
+            for part in parts:
+                if "text" in part:
+                    content_text += part["text"]
+                elif "functionCall" in part:
+                    fc = part["functionCall"]
+                    tool_calls.append(
+                        ToolCall(
+                            id=fc.get("thought_signature") or fc["name"],
+                            name=fc["name"],
+                            arguments=fc.get("args") or {}
+                        )
                     )
-                )
 
-        return LLMResponse(
-            content=msg.content,
-            tool_calls=tool_calls,
-            model_used=model,
-            raw_response=response,
-            assistant_message=msg.model_dump(exclude_none=True),
-        )
+            # Reconstruct OpenAI-compatible assistant_message
+            openai_tc = []
+            for part in parts:
+                if "functionCall" in part:
+                    fc = part["functionCall"]
+                    openai_tc.append({
+                        "id": fc.get("thought_signature") or fc["name"],
+                        "type": "function",
+                        "function": {
+                            "name": fc["name"],
+                            "arguments": json.dumps(fc.get("args") or {}),
+                            "thought_signature": fc.get("thought_signature")
+                        },
+                        "thought_signature": fc.get("thought_signature"),
+                        "functionCall": fc
+                    })
+                    
+            assistant_msg = {
+                "role": "assistant",
+                "content": content_text if content_text else None,
+                "gemini_native_content": content_obj
+            }
+            if openai_tc:
+                assistant_msg["tool_calls"] = openai_tc
+
+            return LLMResponse(
+                content=content_text if content_text else None,
+                tool_calls=tool_calls,
+                model_used=model,
+                raw_response=resp_data,
+                assistant_message=assistant_msg,
+            )
+        else:
+            # Use OpenAI compatibility endpoint for low-latency conversational streaming
+            kwargs: Dict[str, Any] = {
+                "model": clean_model,
+                "messages": messages,
+                "temperature": temperature,
+            }
+            if stream:
+                return _stream_openai_compatible(self.client, kwargs, model)
+
+            response = self.client.chat.completions.create(**kwargs)
+            msg = response.choices[0].message
+            
+            return LLMResponse(
+                content=msg.content,
+                tool_calls=[],
+                model_used=model,
+                raw_response=response,
+                assistant_message=msg.model_dump(exclude_none=True),
+            )
 
 
 class AnthropicProvider(LLMProvider):
