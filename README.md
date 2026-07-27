@@ -128,3 +128,14 @@ To verify that the NERO CLI itself is functioning correctly, run the unit test s
 python -m pytest tests/
 ```
 All 59 unit tests cover safety gates, memory caching, syntax detection, and pipeline executions.
+
+---
+
+## Contributing & License
+
+Contributions are highly welcome! Please check out [CONTRIBUTING.md](file:///C:/Users/91637/Desktop/Projects/coding-agent-nero/CONTRIBUTING.md) for guidelines.
+
+This project is licensed under the MIT License — see the [LICENSE](file:///C:/Users/91637/Desktop/Projects/coding-agent-nero/LICENSE) file for details.
+
+### 💸 API Budget Disclaimer / Sponsor Call
+Google Gemini and OpenRouter integrations are fully tested and verified. However, **no money** was left to verify OpenAI and Anthropic integrations (our developer pockets are dry!). If you want to sponsor our API keys or verify those providers for us, check out the disclaimer in [CONTRIBUTING.md](file:///C:/Users/91637/Desktop/Projects/coding-agent-nero/CONTRIBUTING.md)!
