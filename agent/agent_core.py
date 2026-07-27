@@ -305,8 +305,8 @@ class AgentCore:
                 self.logger.tool(tc.name, tc.arguments, tool_result[:120])
 
                 if tc.name == "clone_repo" and "Successfully" in tool_result:
-                    cloned_path = tc.arguments.get("url_or_path", "")
-                    self.config.repo_path = os.path.abspath(cloned_path) if os.path.isdir(os.path.abspath(cloned_path)) else self.config.repo_path
+                    cloned_path = tool_result.split("workspace: ")[-1].strip()
+                    self.config.repo_path = os.path.abspath(cloned_path)
                     self.memory.repo_context = None
                     self._tool_registry = None
                     self._orchestrator = None

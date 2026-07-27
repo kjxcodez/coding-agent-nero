@@ -309,7 +309,6 @@ def start_repl_session(
                         current_config.reviewer_models = reviewers
                         current_config.summary_models = summaries
                         
-                        import json
                         from . import config as cfg
                         settings = cfg.load_global_settings()
                         settings.update({

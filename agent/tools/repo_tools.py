@@ -56,6 +56,7 @@ class CloneRepoTool(BaseTool):
             mgr = RepositoryManager(self.config)
             actual_path = mgr.prepare_repository(url_or_path)
             
+            self.config.repo_path = actual_path
             if self.memory:
                 self.memory.repo_path = actual_path
             
