@@ -440,6 +440,11 @@ class GeminiProvider(LLMProvider):
                 })
 
             # 2. Build REST body
+            if not gemini_contents:
+                gemini_contents.append({
+                    "role": "user",
+                    "parts": [{"text": "Start executing the plan."}]
+                })
             req_body = {
                 "contents": gemini_contents,
                 "generationConfig": {
