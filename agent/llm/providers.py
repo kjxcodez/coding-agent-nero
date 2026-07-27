@@ -286,9 +286,11 @@ class OpenRouterProvider(LLMProvider):
         tool_choice: Optional[str] = None,
         stream: bool = False,
     ) -> LLMResponse:
+        # Strip the "openrouter/" routing prefix — OpenRouter API only wants the bare model ID
+        clean_model = model[len("openrouter/"):] if model.startswith("openrouter/") else model
         merged_messages = merge_system_messages(messages)
         kwargs: Dict[str, Any] = {
-            "model": model,
+            "model": clean_model,
             "messages": merged_messages,
             "temperature": temperature,
         }
@@ -297,7 +299,7 @@ class OpenRouterProvider(LLMProvider):
             kwargs["tool_choice"] = tool_choice or "auto"
 
         if stream:
-            return _stream_openai_compatible(self.client, kwargs, model)
+            return _stream_openai_compatible(self.client, kwargs, clean_model)
 
         response = self.client.chat.completions.create(**kwargs)
         msg = response.choices[0].message
