@@ -4,6 +4,7 @@ Interactively guides the user to set up API keys and default models on first sta
 """
 
 import os
+import sys
 import json
 import urllib.request
 import urllib.error
@@ -13,6 +14,98 @@ from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 
 console = Console()
+
+def get_key() -> str:
+    """Gets a single keypress from the user cross-platform."""
+    if sys.platform == "win32":
+        import msvcrt
+        ch = msvcrt.getch()
+        if ch in (b'\x00', b'\xe0'):
+            ch2 = msvcrt.getch()
+            if ch2 == b'H': return "up"
+            if ch2 == b'P': return "down"
+            if ch2 == b'K': return "left"
+            if ch2 == b'M': return "right"
+        if ch in (b'\r', b'\n'):
+            return "enter"
+        try:
+            return ch.decode("utf-8", errors="ignore")
+        except Exception:
+            return ""
+    else:
+        import tty, termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+            if ch == '\x1b':
+                ch2 = sys.stdin.read(1)
+                if ch2 == '[':
+                    ch3 = sys.stdin.read(1)
+                    if ch3 == 'A': return "up"
+                    if ch3 == 'B': return "down"
+                    if ch3 == 'C': return "right"
+                    if ch3 == 'D': return "left"
+            elif ch in ('\r', '\n'):
+                return "enter"
+            return ch
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
+def select_option(options: list[str], title: str = "Select:") -> int:
+    """Displays an interactive selection menu using arrow keys."""
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        console.print(f"[bold yellow]{title}[/bold yellow]")
+        for idx, opt in enumerate(options, 1):
+            console.print(f"  {idx}. {opt}")
+        choice = Prompt.ask("Choose option", choices=[str(i) for i in range(1, len(options) + 1)], default="1")
+        return int(choice) - 1
+
+    # Ensure ANSI terminal escape codes are enabled on Windows
+    if sys.platform == "win32":
+        os.system("")
+
+    selected_idx = 0
+    
+    # Hide cursor
+    sys.stdout.write("\033[?25l")
+    sys.stdout.flush()
+    
+    try:
+        while True:
+            console.print(f"[bold yellow]{title}[/bold yellow]")
+            for idx, opt in enumerate(options):
+                if idx == selected_idx:
+                    console.print(f"  [bold cyan]❯ ● {opt}[/bold cyan]")
+                else:
+                    console.print(f"    ○ {opt}")
+            
+            key = get_key()
+            if key == "up":
+                selected_idx = (selected_idx - 1) % len(options)
+            elif key == "down":
+                selected_idx = (selected_idx + 1) % len(options)
+            elif key == "enter":
+                break
+                
+            sys.stdout.write(f"\033[{len(options) + 1}A")
+            sys.stdout.flush()
+            
+    except KeyboardInterrupt:
+        sys.stdout.write("\033[?25h")
+        sys.stdout.flush()
+        raise
+    finally:
+        sys.stdout.write(f"\033[{len(options) + 1}A")
+        sys.stdout.write("\033[J")
+        sys.stdout.write("\033[?25h")
+        sys.stdout.flush()
+        
+    console.print(f"[bold yellow]{title}[/bold yellow] [bold green]{options[selected_idx]}[/bold green]")
+    return selected_idx
+
 
 def validate_key(provider: str, api_key: str) -> bool:
     """Validates the API key by making a lightweight request using urllib."""
@@ -93,30 +186,31 @@ def run_onboarding_if_needed() -> None:
     )
     console.print(Panel(welcome_text, title="NERO Setup Wizard", border_style="cyan"))
 
-    console.print("[bold yellow]Please select a primary provider:[/bold yellow]")
-    console.print("  1. OpenRouter (Access to all models)")
-    console.print("  2. OpenAI")
-    console.print("  3. Google Gemini (AI Studio)")
-    console.print("  4. Anthropic Claude")
+    providers_list = [
+        "OpenRouter (Access to all models)",
+        "OpenAI",
+        "Google Gemini (AI Studio)",
+        "Anthropic Claude"
+    ]
     
-    choice = Prompt.ask("Select provider [1-4]", choices=["1", "2", "3", "4"], default="1")
+    choice_idx = select_option(providers_list, "Please select a primary provider:")
     
     providers_map = {
-        "1": ("openrouter", "OPENROUTER_API_KEY", [
+        0: ("openrouter", "OPENROUTER_API_KEY", [
             "openrouter/free", "google/gemini-2.5-flash", "openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"
         ]),
-        "2": ("openai", "OPENAI_API_KEY", [
+        1: ("openai", "OPENAI_API_KEY", [
             "gpt-4o-mini", "gpt-4o"
         ]),
-        "3": ("google", "GEMINI_API_KEY", [
+        2: ("google", "GEMINI_API_KEY", [
             "gemini-2.5-flash", "gemini-2.5-pro"
         ]),
-        "4": ("anthropic", "ANTHROPIC_API_KEY", [
+        3: ("anthropic", "ANTHROPIC_API_KEY", [
             "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"
         ])
     }
     
-    prov_name, key_name, recommended_models = providers_map[choice]
+    prov_name, key_name, recommended_models = providers_map[choice_idx]
     
     # Prompt for API Key
     while True:
@@ -135,14 +229,11 @@ def run_onboarding_if_needed() -> None:
                 break
 
     # Select Default Model
-    console.print("\n[bold yellow]Select a default model for NERO roles:[/bold yellow]")
-    for idx, model in enumerate(recommended_models, 1):
-        console.print(f"  {idx}. {model}")
-    console.print(f"  {len(recommended_models) + 1}. Enter custom model name")
+    model_options = list(recommended_models) + ["Enter custom model name..."]
+    model_choice_idx = select_option(model_options, "Select a default model for NERO roles:")
     
-    model_choice = Prompt.ask("Choose default model", choices=[str(i) for i in range(1, len(recommended_models) + 2)], default="1")
-    if int(model_choice) <= len(recommended_models):
-        default_model = recommended_models[int(model_choice) - 1]
+    if model_choice_idx < len(recommended_models):
+        default_model = recommended_models[model_choice_idx]
     else:
         default_model = Prompt.ask("Enter custom model identifier").strip()
 
