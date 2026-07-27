@@ -66,6 +66,10 @@ def _stream_openai_compatible(client: OpenAI, kwargs: Dict[str, Any], model: str
                             tool_calls_accum[idx]["name"] = tc.function.name
                         if tc.function.arguments:
                             tool_calls_accum[idx]["arguments"] += tc.function.arguments
+                        if hasattr(tc.function, "thought_signature") and getattr(tc.function, "thought_signature"):
+                            tool_calls_accum[idx]["thought_signature"] = getattr(tc.function, "thought_signature")
+                    if hasattr(tc, "thought_signature") and getattr(tc, "thought_signature"):
+                        tool_calls_accum[idx]["thought_signature"] = getattr(tc, "thought_signature")
 
             # 2. Accumulate reasoning / thinking
             has_reasoning = False
@@ -135,8 +139,9 @@ def _stream_openai_compatible(client: OpenAI, kwargs: Dict[str, Any], model: str
             live.stop()
             console.print()
 
-    # Build final ToolCall objects
+    # Build final ToolCall objects and assistant_message dict
     tool_calls: List[ToolCall] = []
+    tool_calls_list = []
     for idx in sorted(tool_calls_accum.keys()):
         tc_data = tool_calls_accum[idx]
         try:
@@ -150,6 +155,28 @@ def _stream_openai_compatible(client: OpenAI, kwargs: Dict[str, Any], model: str
                 arguments=args,
             )
         )
+        
+        func_dict = {
+            "name": tc_data["name"],
+            "arguments": tc_data["arguments"],
+        }
+        if "thought_signature" in tc_data:
+            func_dict["thought_signature"] = tc_data["thought_signature"]
+        tc_item = {
+            "id": tc_data["id"],
+            "type": "function",
+            "function": func_dict
+        }
+        if "thought_signature" in tc_data:
+            tc_item["thought_signature"] = tc_data["thought_signature"]
+        tool_calls_list.append(tc_item)
+
+    assistant_msg = {
+        "role": "assistant",
+        "content": content_accum if content_accum else None
+    }
+    if tool_calls_list:
+        assistant_msg["tool_calls"] = tool_calls_list
 
     return LLMResponse(
         content=content_accum if content_accum else None,
@@ -157,6 +184,7 @@ def _stream_openai_compatible(client: OpenAI, kwargs: Dict[str, Any], model: str
         model_used=model,
         raw_response=None,
         streamed=True,
+        assistant_message=assistant_msg,
     )
 
 
@@ -213,6 +241,7 @@ class OpenAIProvider(LLMProvider):
             tool_calls=tool_calls,
             model_used=model,
             raw_response=response,
+            assistant_message=msg.model_dump(exclude_none=True),
         )
 
 
@@ -276,6 +305,7 @@ class OpenRouterProvider(LLMProvider):
             tool_calls=tool_calls,
             model_used=model,
             raw_response=response,
+            assistant_message=msg.model_dump(exclude_none=True),
         )
 
 
@@ -339,6 +369,7 @@ class GeminiProvider(LLMProvider):
             tool_calls=tool_calls,
             model_used=model,
             raw_response=response,
+            assistant_message=msg.model_dump(exclude_none=True),
         )
 
 
@@ -457,11 +488,29 @@ class AnthropicProvider(LLMProvider):
                     )
                 )
 
+        openai_tc = []
+        for tc in tool_calls:
+            openai_tc.append({
+                "id": tc.id,
+                "type": "function",
+                "function": {
+                    "name": tc.name,
+                    "arguments": json.dumps(tc.arguments)
+                }
+            })
+        assistant_msg = {
+            "role": "assistant",
+            "content": content_text if content_text else None
+        }
+        if openai_tc:
+            assistant_msg["tool_calls"] = openai_tc
+
         return LLMResponse(
             content=content_text if content_text else None,
             tool_calls=tool_calls,
             model_used=model,
             raw_response=response,
+            assistant_message=assistant_msg,
         )
 
     def _stream_anthropic(self, kwargs: Dict[str, Any], model: str) -> LLMResponse:
@@ -521,8 +570,9 @@ class AnthropicProvider(LLMProvider):
                 live.stop()
                 console.print()
 
-        # Build final ToolCall objects
+        # Build final ToolCall objects and assistant_message dict
         tool_calls: List[ToolCall] = []
+        openai_tc = []
         for tc_id, tc_data in tool_calls_accum.items():
             try:
                 args = json.loads(tc_data["arguments"] or "{}")
@@ -535,11 +585,27 @@ class AnthropicProvider(LLMProvider):
                     arguments=args
                 )
             )
+            openai_tc.append({
+                "id": tc_data["id"],
+                "type": "function",
+                "function": {
+                    "name": tc_data["name"],
+                    "arguments": tc_data["arguments"]
+                }
+            })
+            
+        assistant_msg = {
+            "role": "assistant",
+            "content": content_accum if content_accum else None
+        }
+        if openai_tc:
+            assistant_msg["tool_calls"] = openai_tc
 
         return LLMResponse(
             content=content_accum if content_accum else None,
             tool_calls=tool_calls,
             model_used=model,
             raw_response=None,
-            streamed=True
+            streamed=True,
+            assistant_message=assistant_msg,
         )

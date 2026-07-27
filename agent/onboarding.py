@@ -323,7 +323,17 @@ def run_onboarding_if_needed() -> None:
     with open(config.SETTINGS_PATH, "w", encoding="utf-8") as f:
         json.dump(settings, f, indent=2)
 
-    console.print(f"\n[bold green]✓ Configuration successfully saved to {config.SETTINGS_PATH} and credentials saved to {config.CREDENTIALS_PATH}![/bold green]")
+    settings_abs = os.path.abspath(config.SETTINGS_PATH)
+    creds_abs = os.path.abspath(config.CREDENTIALS_PATH)
+    
+    console.print()
+    console.print(Panel(
+        f"[bold green]✓ Configuration successfully saved![/bold green]\n\n"
+        f"  • Settings   : [bold cyan]{settings_abs}[/bold cyan]\n"
+        f"  • Credentials: [bold cyan]{creds_abs}[/bold cyan]",
+        title="[bold green]Setup Complete[/bold green]",
+        border_style="green"
+    ))
 
     # Reload variables in config module so execution can continue
     config.OPENROUTER_API_KEY = credentials.get("OPENROUTER_API_KEY", "")
@@ -336,3 +346,27 @@ def run_onboarding_if_needed() -> None:
     config._credentials = credentials
     
     console.print("[bold green]Starting NERO session...[/bold green]\n")
+
+
+def resolve_model_with_provider(model_name: str) -> str:
+    """Helper to detect provider for a model and prepend prefix if missing."""
+    if "/" in model_name:
+        return model_name
+    
+    # Try to detect by name prefix
+    if model_name.startswith("gemini-"):
+        return f"google/{model_name}"
+    if model_name.startswith("gpt-"):
+        return f"openai/{model_name}"
+    if model_name.startswith("claude-"):
+        return f"anthropic/{model_name}"
+        
+    # Fallback to configured keys
+    from . import config
+    if config.GEMINI_API_KEY:
+        return f"google/{model_name}"
+    if config.OPENAI_API_KEY:
+        return f"openai/{model_name}"
+    if config.ANTHROPIC_API_KEY:
+        return f"anthropic/{model_name}"
+    return f"openrouter/{model_name}"

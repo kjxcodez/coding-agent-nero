@@ -86,6 +86,7 @@ def show_help_panel():
         "  • [bold green]/undo[/bold green]                Revert recent uncommitted changes.\n"
         "  • [bold green]/status[/bold green]              Display session working memory status.\n"
         "  • [bold green]/logs [view|list][/bold green]       View current session log file or list recent sessions.\n"
+        "  • [bold green]/model [name][/bold green]         Show or switch active role-based models.\n"
         "  • [bold green]/auto[/bold green]                Run default autonomous benchmark task.\n"
         "  • [bold green]/help[/bold green]                Show this help panel.\n"
         "  • [bold green]exit[/bold green] or [bold green]quit[/bold green]          Exit NERO session.\n"
@@ -246,6 +247,85 @@ def start_repl_session(
                         if not handled:
                             console.print(f"[dim]Symbol '{arg}' not in index. Falling back to LLM search...[/dim]")
                             agent.process_prompt(f"where is {arg} defined")
+                    continue
+
+                if cmd in ("/model", "/m"):
+                    if not arg:
+                        console.print(Panel(
+                            f"[bold yellow]Current Active Models per Role:[/bold yellow]\n\n"
+                            f"  • Planner : [bold cyan]{current_config.planner_models}[/bold cyan]\n"
+                            f"  • Coder   : [bold cyan]{current_config.coder_models}[/bold cyan]\n"
+                            f"  • Verifier: [bold cyan]{current_config.verifier_models}[/bold cyan]\n"
+                            f"  • Reviewer: [bold cyan]{current_config.reviewer_models}[/bold cyan]\n"
+                            f"  • Summary : [bold cyan]{current_config.summary_models}[/bold cyan]",
+                            title="[bold yellow]NERO Active Models[/bold yellow]",
+                            border_style="yellow"
+                        ))
+                    else:
+                        from .onboarding import resolve_model_with_provider
+                        resolved = resolve_model_with_provider(arg)
+                        
+                        if resolved.startswith("google/"):
+                            all_gemini = ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "google/gemini-3-flash", "google/gemini-3.5-flash-lite"]
+                            if resolved in all_gemini:
+                                all_gemini.remove(resolved)
+                            gemini_chain = [resolved] + all_gemini
+                            planners = gemini_chain + ["openai/gpt-4o-mini", "openrouter/free"]
+                            coders = [resolved, "google/gemini-3.6-flash", "google/gemini-3-flash", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest"]
+                            verifiers = [resolved, "google/gemini-3.5-flash-lite", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini"]
+                            reviewers = [resolved, "google/gemini-3.6-flash", "google/gemini-3-flash", "openai/gpt-4o-mini"]
+                            summaries = [resolved, "google/gemini-3.5-flash-lite", "openai/gpt-4o-mini"]
+                        elif resolved.startswith("openai/"):
+                            planners = [resolved, "openai/gpt-4o-mini"]
+                            coders = [resolved, "openai/gpt-4o"]
+                            verifiers = [resolved, "openai/gpt-4o-mini"]
+                            reviewers = [resolved, "openai/gpt-4o-mini"]
+                            summaries = [resolved, "openai/gpt-4o-mini"]
+                        elif resolved.startswith("anthropic/"):
+                            planners = [resolved, "openai/gpt-4o-mini"]
+                            coders = [resolved, "anthropic/claude-3-5-sonnet-latest"]
+                            verifiers = [resolved, "openai/gpt-4o-mini"]
+                            reviewers = [resolved, "openai/gpt-4o-mini"]
+                            summaries = [resolved, "openai/gpt-4o-mini"]
+                        else:
+                            planners = [resolved]
+                            coders = [resolved]
+                            verifiers = [resolved]
+                            reviewers = [resolved]
+                            summaries = [resolved]
+
+                        current_config.planner_models = planners
+                        current_config.coder_models = coders
+                        current_config.verifier_models = verifiers
+                        current_config.reviewer_models = reviewers
+                        current_config.summary_models = summaries
+                        
+                        import json
+                        from . import config as cfg
+                        settings = cfg.load_global_settings()
+                        settings.update({
+                            "planner_models": planners,
+                            "coder_models": coders,
+                            "verifier_models": verifiers,
+                            "reviewer_models": reviewers,
+                            "summary_models": summaries,
+                        })
+                        cfg.ensure_nero_dirs()
+                        with open(cfg.SETTINGS_PATH, "w", encoding="utf-8") as f:
+                            json.dump(settings, f, indent=2)
+                        
+                        agent = AgentCore(current_config, memory, logger)
+                        
+                        console.print(Panel(
+                            f"[bold green]✓ Active model successfully updated to [cyan]{resolved}[/cyan]![/bold green]\n\n"
+                            f"  • Planner : [bold cyan]{current_config.planner_models}[/bold cyan]\n"
+                            f"  • Coder   : [bold cyan]{current_config.coder_models}[/bold cyan]\n"
+                            f"  • Verifier: [bold cyan]{current_config.verifier_models}[/bold cyan]\n"
+                            f"  • Reviewer: [bold cyan]{current_config.reviewer_models}[/bold cyan]\n"
+                            f"  • Summary : [bold cyan]{current_config.summary_models}[/bold cyan]",
+                            title="[bold green]Model Switched[/bold green]",
+                            border_style="green"
+                        ))
                     continue
 
                 if cmd == "/repo":

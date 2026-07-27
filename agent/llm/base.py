@@ -23,6 +23,7 @@ class LLMResponse:
     model_used: str = "unknown"
     raw_response: Any = None
     streamed: bool = False
+    assistant_message: Optional[Dict[str, Any]] = None
 
 
 class LLMProvider(ABC):

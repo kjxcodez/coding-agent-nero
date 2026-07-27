@@ -194,21 +194,24 @@ class AgentCore:
                     self.logger.markdown(final_text)
                 break
 
-            messages.append({
-                "role": "assistant",
-                "content": response.content or "",
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.name,
-                            "arguments": json.dumps(tc.arguments),
-                        },
-                    }
-                    for tc in response.tool_calls
-                ],
-            })
+            if response.assistant_message:
+                messages.append(response.assistant_message)
+            else:
+                messages.append({
+                    "role": "assistant",
+                    "content": response.content or "",
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": json.dumps(tc.arguments),
+                            },
+                        }
+                        for tc in response.tool_calls
+                    ],
+                })
 
             for tc in response.tool_calls:
                 tool_result = tool_registry.dispatch(tc.name, tc.arguments)
@@ -275,21 +278,24 @@ class AgentCore:
                     self.logger.markdown(final_text)
                 break
 
-            messages.append({
-                "role": "assistant",
-                "content": response.content or "",
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.name,
-                            "arguments": json.dumps(tc.arguments),
-                        },
-                    }
-                    for tc in response.tool_calls
-                ],
-            })
+            if response.assistant_message:
+                messages.append(response.assistant_message)
+            else:
+                messages.append({
+                    "role": "assistant",
+                    "content": response.content or "",
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": json.dumps(tc.arguments),
+                            },
+                        }
+                        for tc in response.tool_calls
+                    ],
+                })
 
             for tc in response.tool_calls:
                 tool_result = tool_registry.dispatch(tc.name, tc.arguments)

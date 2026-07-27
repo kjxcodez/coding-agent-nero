@@ -99,21 +99,24 @@ class ToolLoopExecutor:
                         break
                     continue
 
-            messages.append({
-                "role": "assistant",
-                "content": content,
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.name,
-                            "arguments": json.dumps(tc.arguments),
-                        },
-                    }
-                    for tc in response.tool_calls
-                ],
-            })
+            if response.assistant_message:
+                messages.append(response.assistant_message)
+            else:
+                messages.append({
+                    "role": "assistant",
+                    "content": content,
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": json.dumps(tc.arguments),
+                            },
+                        }
+                        for tc in response.tool_calls
+                    ],
+                })
 
             for tc in response.tool_calls:
                 tool_result = self._tools.dispatch(tc.name, tc.arguments)
