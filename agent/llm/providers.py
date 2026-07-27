@@ -374,11 +374,14 @@ class GeminiProvider(LLMProvider):
             system_parts = []
             for msg in messages:
                 if msg["role"] == "system":
-                    system_parts.append(msg["content"])
+                    if msg.get("content"):
+                        system_parts.append(msg["content"])
                     continue
                     
                 if "gemini_native_content" in msg:
-                    gemini_contents.append(msg["gemini_native_content"])
+                    native_content = msg["gemini_native_content"]
+                    if native_content and native_content.get("parts"):
+                        gemini_contents.append(native_content)
                     continue
                     
                 role = "user" if msg["role"] in ("user", "tool") else "model"
@@ -432,12 +435,15 @@ class GeminiProvider(LLMProvider):
                         }
                     })
                 else:
-                    parts.append({"text": msg["content"]})
+                    if msg.get("content"):
+                        parts.append({"text": msg["content"]})
                     
-                gemini_contents.append({
-                    "role": role,
-                    "parts": parts
-                })
+                # Only append the message if it actually contains parts!
+                if parts:
+                    gemini_contents.append({
+                        "role": role,
+                        "parts": parts
+                    })
 
             # 2. Build REST body
             if not gemini_contents:
