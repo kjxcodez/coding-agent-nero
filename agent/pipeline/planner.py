@@ -79,7 +79,7 @@ class IncrementalPlanner:
 
         for attempt in range(1, 3):
             try:
-                response = self._router.chat("planner", messages)
+                response = self._router.chat("planner", messages, stream=True)
                 raw = response.content or ""
                 plan = self._parse_plan(raw, model_used=response.model_used)
                 return plan

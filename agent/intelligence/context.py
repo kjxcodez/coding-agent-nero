@@ -153,4 +153,7 @@ class RepositoryContext:
         if self.symbols:
             lines.append(f"\nSymbol Index: {len(self.symbols)} symbols indexed")
 
+        if self.file_tree_snippet:
+            lines.append(f"\nFile Structure Preview:\n{self.file_tree_snippet}")
+
         return "\n".join(lines)

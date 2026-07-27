@@ -307,21 +307,31 @@ class RepositoryScanner:
             return "User Interaction → Component → State → API Client"
         return "Input → Processing → Output"
 
-    def _generate_tree_snippet(self, files: List[str], max_lines: int = 40) -> str:
-        top_level: Dict[str, List[str]] = {}
+    def _generate_tree_snippet(self, files: List[str], max_lines: int = 60) -> str:
+        # Build a hierarchical structure
+        tree = {}
         for f in files:
             parts = f.split("/")
-            top = parts[0]
-            if top not in top_level:
-                top_level[top] = []
-            if len(parts) == 1:
-                top_level[top] = None
+            curr = tree
+            for part in parts:
+                if part not in curr:
+                    curr[part] = {}
+                curr = curr[part]
 
         lines = []
-        for name in sorted(top_level.keys())[:max_lines]:
-            if top_level[name] is None:
-                lines.append(f"  {name}")
-            else:
-                lines.append(f"  {name}/")
-
+        def _render(node, indent="  ", depth=0):
+            if len(lines) >= max_lines:
+                return
+            for name in sorted(node.keys()):
+                if len(lines) >= max_lines:
+                    break
+                sub = node[name]
+                if not sub:
+                    lines.append(f"{indent}{name}")
+                else:
+                    lines.append(f"{indent}{name}/")
+                    if depth < 2:  # Traverse up to 2 levels deep
+                        _render(sub, indent + "    ", depth + 1)
+                        
+        _render(tree, "  ", 0)
         return "\n".join(lines)
