@@ -189,6 +189,20 @@ def _stream_openai_compatible(client: OpenAI, kwargs: Dict[str, Any], model: str
     )
 
 
+def merge_system_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Helper to merge multiple system messages into a single system message at index 0."""
+    system_contents = []
+    other_messages = []
+    for msg in messages:
+        if msg.get("role") == "system":
+            system_contents.append(msg["content"])
+        else:
+            other_messages.append(msg)
+    if system_contents:
+        return [{"role": "system", "content": "\n\n".join(system_contents)}] + other_messages
+    return other_messages
+
+
 class OpenAIProvider(LLMProvider):
     """Direct adapter for native OpenAI API endpoint."""
 
@@ -207,9 +221,10 @@ class OpenAIProvider(LLMProvider):
         tool_choice: Optional[str] = None,
         stream: bool = False,
     ) -> LLMResponse:
+        merged_messages = merge_system_messages(messages)
         kwargs: Dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": merged_messages,
             "temperature": temperature,
         }
         if tools:
@@ -271,9 +286,10 @@ class OpenRouterProvider(LLMProvider):
         tool_choice: Optional[str] = None,
         stream: bool = False,
     ) -> LLMResponse:
+        merged_messages = merge_system_messages(messages)
         kwargs: Dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": merged_messages,
             "temperature": temperature,
         }
         if tools:
@@ -527,9 +543,10 @@ class GeminiProvider(LLMProvider):
             )
         else:
             # Use OpenAI compatibility endpoint for low-latency conversational streaming
+            merged_messages = merge_system_messages(messages)
             kwargs: Dict[str, Any] = {
                 "model": clean_model,
-                "messages": messages,
+                "messages": merged_messages,
                 "temperature": temperature,
             }
             if stream:
