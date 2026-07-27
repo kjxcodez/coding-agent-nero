@@ -134,7 +134,7 @@ def validate_key(provider: str, api_key: str) -> bool:
             "Content-Type": "application/json"
         }
         data = json.dumps({
-            "model": "gemini-2.5-flash",
+            "model": "gemini-1.5-flash",
             "messages": [{"role": "user", "content": "ping"}],
             "max_tokens": 1
         }).encode("utf-8")
@@ -197,13 +197,13 @@ def run_onboarding_if_needed() -> None:
     
     providers_map = {
         0: ("openrouter", "OPENROUTER_API_KEY", [
-            "openrouter/free", "google/gemini-2.5-flash", "openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"
+            "openrouter/free", "google/gemini-1.5-flash", "openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"
         ]),
         1: ("openai", "OPENAI_API_KEY", [
             "gpt-4o-mini", "gpt-4o"
         ]),
         2: ("google", "GEMINI_API_KEY", [
-            "gemini-2.5-flash", "gemini-2.5-pro"
+            "gemini-1.5-flash", "gemini-1.5-pro"
         ]),
         3: ("anthropic", "ANTHROPIC_API_KEY", [
             "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"
