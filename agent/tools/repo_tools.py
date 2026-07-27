@@ -6,7 +6,8 @@ from typing import Any, Dict, Optional
 from .base import BaseTool
 from .safety import ToolSafetyGuard
 from ..config import AgentConfig
-
+from ..agent_core import AgentCore
+from ..repo import RepositoryManager
 
 class CloneRepoTool(BaseTool):
     """Tool for cloning a remote Git repository URL or binding a local directory."""
@@ -43,9 +44,7 @@ class CloneRepoTool(BaseTool):
 
     def execute(self, url_or_path: str, **kwargs) -> str:
         try:
-            # Prepare repository is managed in AgentCore.repo_mgr
-            from ..agent_core import AgentCore
-            
+            # Prepare repository is managed in AgentCore.repo_mgr            
             # Since prepare_repository is called in ensure_repository_context,
             # we update config.repo_path and memory.repo_path.
             if self.memory:
@@ -55,7 +54,6 @@ class CloneRepoTool(BaseTool):
             self.config.repo_path = url_or_path
             
             # Trigger setup via running the manager
-            from ..repo import RepositoryManager
             mgr = RepositoryManager(self.config)
             actual_path = mgr.prepare_repository(url_or_path)
             
