@@ -129,7 +129,7 @@ def validate_key(provider: str, api_key: str) -> bool:
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     elif provider == "google":
         # Try multiple Gemini models sequentially to handle 503 Service Unavailable / Spikes
-        models_to_try = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3-flash", "gemini-3.5-flash-lite"]
+        models_to_try = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash-lite"]
         last_err = None
         for m in models_to_try:
             url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
@@ -229,7 +229,7 @@ def run_onboarding_if_needed() -> None:
             "gpt-4o-mini", "gpt-4o"
         ]),
         2: ("google", "GEMINI_API_KEY", [
-            "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-flash-lite"
+            "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-flash-lite"
         ]),
         3: ("anthropic", "ANTHROPIC_API_KEY", [
             "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"
@@ -275,15 +275,15 @@ def run_onboarding_if_needed() -> None:
     if prov_name == "google":
         clean_model = default_model.split("/")[-1]
         model_ref = f"google/{clean_model}"
-        all_gemini = ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "google/gemini-3-flash", "google/gemini-3.5-flash-lite"]
+        all_gemini = ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "google/gemini-3-flash-preview", "google/gemini-3.5-flash-lite"]
         if model_ref in all_gemini:
             all_gemini.remove(model_ref)
         gemini_chain = [model_ref] + all_gemini
         
         planners = gemini_chain + ["openai/gpt-4o-mini", "openrouter/free"]
-        coders = [model_ref, "google/gemini-3.6-flash", "google/gemini-3-flash", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest"]
+        coders = [model_ref, "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest"]
         verifiers = [model_ref, "google/gemini-3.5-flash-lite", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini"]
-        reviewers = [model_ref, "google/gemini-3.6-flash", "google/gemini-3-flash", "openai/gpt-4o-mini"]
+        reviewers = [model_ref, "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o-mini"]
         summaries = [model_ref, "google/gemini-3.5-flash-lite", "openai/gpt-4o-mini"]
     elif prov_name == "openai":
         clean_model = default_model.split("/")[-1]

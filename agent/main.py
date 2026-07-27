@@ -266,14 +266,14 @@ def start_repl_session(
                         resolved = resolve_model_with_provider(arg)
                         
                         if resolved.startswith("google/"):
-                            all_gemini = ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "google/gemini-3-flash", "google/gemini-3.5-flash-lite"]
+                            all_gemini = ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "google/gemini-3-flash-preview", "google/gemini-3.5-flash-lite"]
                             if resolved in all_gemini:
                                 all_gemini.remove(resolved)
                             gemini_chain = [resolved] + all_gemini
                             planners = gemini_chain + ["openai/gpt-4o-mini", "openrouter/free"]
-                            coders = [resolved, "google/gemini-3.6-flash", "google/gemini-3-flash", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest"]
+                            coders = [resolved, "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest"]
                             verifiers = [resolved, "google/gemini-3.5-flash-lite", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini"]
-                            reviewers = [resolved, "google/gemini-3.6-flash", "google/gemini-3-flash", "openai/gpt-4o-mini"]
+                            reviewers = [resolved, "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o-mini"]
                             summaries = [resolved, "google/gemini-3.5-flash-lite", "openai/gpt-4o-mini"]
                         elif resolved.startswith("openai/"):
                             planners = [resolved, "openai/gpt-4o-mini"]
