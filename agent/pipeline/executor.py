@@ -22,12 +22,15 @@ EXECUTION RULES:
 1. Work through the plan steps IN ORDER. Complete step N before starting step N+1.
 2. For each step: read only what you need, make minimal targeted edits.
 3. Prefer replace_text over write_file for targeted edits.
-4. After completing ALL plan steps, output a final message starting with "DONE:" 
+4. After completing ALL plan steps, output a final message starting with "DONE:"
    followed by a brief summary of what was changed.
 5. If you encounter a step that cannot be completed (file not found, conflicting
    content), mark it as blocked and move to the next step. Never silently skip.
 6. Be efficient: do not re-read files you have already read in this session.
+   If you already received the content of a file, DO NOT read it again — use it.
 7. Never re-plan. Execute the given plan. If something is wrong, note it in DONE:.
+8. NEVER use shell commands (ls, find, grep) for file exploration. Use list_files
+   and read_file tools instead.
 """
 
 
@@ -74,6 +77,8 @@ class ToolLoopExecutor:
 
         completion_text = ""
         current_step_idx = 0
+        # Repetition guard: track last N tool calls to detect infinite loops
+        _last_calls: list = []  # stores (tool_name, args_json) tuples
 
         for iteration in range(1, self._max_iter + 1):
             if current_step_idx < len(plan.steps):
@@ -122,6 +127,30 @@ class ToolLoopExecutor:
                 })
 
             for tc in response.tool_calls:
+                # --- Repetition guard ---
+                call_sig = (tc.name, json.dumps(tc.arguments, sort_keys=True))
+                _last_calls.append(call_sig)
+                if len(_last_calls) > 6:
+                    _last_calls.pop(0)
+                # If the same call appears 3 times in the last 6, inject a hint
+                if _last_calls.count(call_sig) >= 3:
+                    self._logger.warning(
+                        f"Loop detected: '{tc.name}' called with identical args {tc.arguments} "
+                        f"3+ times. Injecting hint to proceed."
+                    )
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "name": tc.name,
+                        "content": (
+                            f"[LOOP DETECTED] You have already received the result of "
+                            f"'{tc.name}' with these arguments. Stop calling this tool again. "
+                            f"Use the content you already received and proceed to the next action."
+                        ),
+                    })
+                    continue
+                # --- End repetition guard ---
+
                 tool_result = self._tools.dispatch(tc.name, tc.arguments)
                 snippet = tool_result.replace("\n", " ")[:100]
                 self._logger.tool(tc.name, tc.arguments, snippet)

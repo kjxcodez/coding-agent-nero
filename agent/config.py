@@ -28,7 +28,7 @@ def ensure_nero_dirs():
 
 # Default configuration settings
 DEFAULT_SETTINGS = {
-    "planner_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini", "openrouter/free"],
+    "planner_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini", "openrouter/google/gemma-4-27b-it:free"],
     "coder_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest"],
     "verifier_models": ["google/gemini-3.5-flash-lite", "google/gemini-3.5-flash", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini"],
     "reviewer_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o-mini"],

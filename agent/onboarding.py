@@ -223,7 +223,11 @@ def run_onboarding_if_needed() -> None:
     
     providers_map = {
         0: ("openrouter", "OPENROUTER_API_KEY", [
-            "openrouter/free", "google/gemini-3.5-flash", "openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"
+            "openrouter/poolside/laguna-s-2.1:free",
+            "openrouter/poolside/laguna-m.1:free",
+            "openrouter/google/gemma-4-27b-it:free",
+            "openrouter/cohere/north-mini-code:free",
+            "google/gemini-3.5-flash", "openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"
         ]),
         1: ("openai", "OPENAI_API_KEY", [
             "gpt-4o-mini", "gpt-4o"
@@ -302,11 +306,21 @@ def run_onboarding_if_needed() -> None:
         reviewers = [model_ref, "openai/gpt-4o-mini"]
         summaries = [model_ref, "openai/gpt-4o-mini"]
     else:
-        planners = [default_model]
-        coders = [default_model]
-        verifiers = [default_model]
-        reviewers = [default_model]
-        summaries = [default_model]
+        # OpenRouter: assign real free-tier coding models
+        planners = [
+            default_model,
+            "openrouter/google/gemma-4-27b-it:free",
+            "openrouter/poolside/laguna-s-2.1:free",
+        ]
+        coders = [
+            default_model,
+            "openrouter/poolside/laguna-m.1:free",
+            "openrouter/cohere/north-mini-code:free",
+            "openrouter/google/gemma-4-27b-it:free",
+        ]
+        verifiers = [default_model, "openrouter/google/gemma-4-27b-it:free"]
+        reviewers = [default_model, "openrouter/poolside/laguna-s-2.1:free"]
+        summaries = [default_model, "openrouter/google/gemma-4-27b-it:free"]
 
     settings = {
         "planner_models": planners,
