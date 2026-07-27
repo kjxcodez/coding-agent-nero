@@ -128,17 +128,43 @@ def validate_key(provider: str, api_key: str) -> bool:
         }).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     elif provider == "google":
-        url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        data = json.dumps({
-            "model": "gemini-3.5-flash",
-            "messages": [{"role": "user", "content": "ping"}],
-            "max_tokens": 1
-        }).encode("utf-8")
-        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        # Try multiple Gemini models sequentially to handle 503 Service Unavailable / Spikes
+        models_to_try = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro", "gemini-3.5-flash-lite"]
+        last_err = None
+        for m in models_to_try:
+            url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            data = json.dumps({
+                "model": m,
+                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 1
+            }).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    if response.status == 200:
+                        return True
+            except urllib.error.HTTPError as e:
+                if e.code == 401:
+                    console.print(f"[bold red]Validation error (HTTP {e.code}):[/bold red] Unauthorized API Key")
+                    return False
+                last_err = e
+            except Exception as e:
+                last_err = e
+        if last_err:
+            if isinstance(last_err, urllib.error.HTTPError):
+                console.print(f"[bold red]Validation error (HTTP {last_err.code}):[/bold red] {last_err.reason}")
+                try:
+                    error_body = last_err.read().decode("utf-8")
+                    console.print(f"[dim red]{error_body}[/dim red]")
+                except Exception:
+                    pass
+            else:
+                console.print(f"[bold red]Connection error:[/bold red] {last_err}")
+        return False
     elif provider == "anthropic":
         url = "https://api.anthropic.com/v1/messages"
         headers = {
@@ -245,12 +271,49 @@ def run_onboarding_if_needed() -> None:
         json.dump(credentials, f, indent=2)
 
     # Save settings
+    # Save settings with multi-model fallback chains
+    if prov_name == "google":
+        clean_model = default_model.split("/")[-1]
+        model_ref = f"google/{clean_model}"
+        all_gemini = ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "google/gemini-3.1-pro", "google/gemini-3.5-flash-lite"]
+        if model_ref in all_gemini:
+            all_gemini.remove(model_ref)
+        gemini_chain = [model_ref] + all_gemini
+        
+        planners = gemini_chain + ["openai/gpt-4o-mini", "openrouter/free"]
+        coders = [model_ref, "google/gemini-3.6-flash", "google/gemini-3.1-pro", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest"]
+        verifiers = [model_ref, "google/gemini-3.5-flash-lite", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini"]
+        reviewers = [model_ref, "google/gemini-3.6-flash", "google/gemini-3.1-pro", "openai/gpt-4o-mini"]
+        summaries = [model_ref, "google/gemini-3.5-flash-lite", "openai/gpt-4o-mini"]
+    elif prov_name == "openai":
+        clean_model = default_model.split("/")[-1]
+        model_ref = f"openai/{clean_model}"
+        planners = [model_ref, "openai/gpt-4o-mini"]
+        coders = [model_ref, "openai/gpt-4o"]
+        verifiers = [model_ref, "openai/gpt-4o-mini"]
+        reviewers = [model_ref, "openai/gpt-4o-mini"]
+        summaries = [model_ref, "openai/gpt-4o-mini"]
+    elif prov_name == "anthropic":
+        clean_model = default_model.split("/")[-1]
+        model_ref = f"anthropic/{clean_model}"
+        planners = [model_ref, "openai/gpt-4o-mini"]
+        coders = [model_ref, "anthropic/claude-3-5-sonnet-latest"]
+        verifiers = [model_ref, "openai/gpt-4o-mini"]
+        reviewers = [model_ref, "openai/gpt-4o-mini"]
+        summaries = [model_ref, "openai/gpt-4o-mini"]
+    else:
+        planners = [default_model]
+        coders = [default_model]
+        verifiers = [default_model]
+        reviewers = [default_model]
+        summaries = [default_model]
+
     settings = {
-        "planner_models": [default_model],
-        "coder_models": [default_model],
-        "verifier_models": [default_model],
-        "reviewer_models": [default_model],
-        "summary_models": [default_model],
+        "planner_models": planners,
+        "coder_models": coders,
+        "verifier_models": verifiers,
+        "reviewer_models": reviewers,
+        "summary_models": summaries,
         "repo_path": "./target_repo",
         "max_iterations": 15,
         "max_repair_attempts": 3,
