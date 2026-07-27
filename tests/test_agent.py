@@ -842,6 +842,52 @@ class TestPhase5(unittest.TestCase):
         })
         self.assertEqual(res_read_final, "console.log('fully-healed');")
 
+    def test_tool_message_name_field(self):
+        from agent.pipeline.executor import ToolLoopExecutor
+        from agent.pipeline.models import IncrementalPlan, PlanStep
+        from unittest.mock import MagicMock
+        from agent.llm.base import LLMResponse, ToolCall
+        
+        from agent.llm.router import ModelRouter
+        router = ModelRouter(self.config)
+        self.logger.tool = lambda name, args, snippet: None
+        executor = ToolLoopExecutor(router, ToolRegistry(self.config, self.repo_path), self.logger)
+        plan = IncrementalPlan(
+            goal="test",
+            understanding="test",
+            approach="test",
+            affected_files=[],
+            steps=[PlanStep(id=1, description="test")],
+            validation_commands=[],
+            risks=[],
+            created_at="2026-07-27"
+        )
+        
+        mock_response = LLMResponse(
+            content=None,
+            tool_calls=[ToolCall(id="call_test", name="read_file", arguments={"path": "package.json"})],
+            model_used="test_model",
+            assistant_message={"role": "assistant", "content": None, "tool_calls": []}
+        )
+        
+        executor._router.chat = MagicMock(side_effect=[
+            mock_response,
+            LLMResponse(content="DONE", tool_calls=[], model_used="test_model")
+        ])
+        
+        with open(os.path.join(self.repo_path, "package.json"), "w") as f:
+            f.write("{}")
+            
+        executor.execute(plan, "context")
+        
+        called_args = executor._router.chat.call_args_list
+        messages_sent = called_args[1][0][1]
+        
+        tool_msg = next((m for m in messages_sent if m.get("role") == "tool"), None)
+        self.assertIsNotNone(tool_msg)
+        self.assertEqual(tool_msg.get("name"), "read_file")
+        self.assertEqual(tool_msg.get("tool_call_id"), "call_test")
+
 
 if __name__ == "__main__":
     unittest.main()

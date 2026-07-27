@@ -229,6 +229,7 @@ class AgentCore:
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
+                    "name": tc.name,
                     "content": tool_result,
                 })
         else:
@@ -318,6 +319,7 @@ class AgentCore:
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
+                    "name": tc.name,
                     "content": tool_result,
                 })
         else:

@@ -135,6 +135,7 @@ class ToolLoopExecutor:
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
+                    "name": tc.name,
                     "content": tool_result,
                 })
         else:
