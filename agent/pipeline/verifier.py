@@ -28,6 +28,14 @@ class VerificationEngine:
         if not commands:
             commands = self._auto_detect_commands(repo_path)
 
+        # Intercept placeholder/empty test commands
+        if commands == ["npm test"] and self._is_placeholder_test_suite(repo_path):
+            self._logger.warning(
+                "Placeholder or missing test suite detected in package.json. "
+                "Falling back to syntax checking and boot check verification..."
+            )
+            return self._run_syntax_and_boot_checks(repo_path)
+
         if not commands:
             self._logger.warning(
                 "VerificationEngine: No validation commands found. "
@@ -49,6 +57,132 @@ class VerificationEngine:
                 return result
 
         return result
+
+    def _is_placeholder_test_suite(self, repo_path: str) -> bool:
+        pkg_json_path = os.path.join(repo_path, "package.json")
+        if os.path.isfile(pkg_json_path):
+            try:
+                import json
+                with open(pkg_json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                # Check scripts.test
+                test_script = data.get("scripts", {}).get("test", "")
+                if "no test specified" in test_script or not test_script.strip():
+                    return True
+                
+                # Check if any standard test framework exists in dependencies/devDependencies
+                deps = data.get("dependencies", {})
+                dev_deps = data.get("devDependencies", {})
+                test_frameworks = ("jest", "mocha", "jasmine", "tape", "vitest", "ava", "cypress", "playwright")
+                has_framework = any(
+                    any(fw in dep for fw in test_frameworks)
+                    for dep in (list(deps.keys()) + list(dev_deps.keys()))
+                )
+                if not has_framework:
+                    return True
+            except Exception:
+                return True
+        return False
+
+    def _run_syntax_and_boot_checks(self, repo_path: str) -> VerificationResult:
+        # 1. Syntax Check modified JS files
+        modified_files = []
+        try:
+            res = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+            )
+            for line in res.stdout.splitlines():
+                if line.strip():
+                    parts = line.strip().split()
+                    if parts and parts[-1].endswith(".js"):
+                        modified_files.append(parts[-1])
+        except Exception:
+            pass
+
+        for f in modified_files:
+            full_path = os.path.join(repo_path, f)
+            if os.path.isfile(full_path):
+                proc = subprocess.run(["node", "-c", f], cwd=repo_path, capture_output=True, text=True)
+                if proc.returncode != 0:
+                    return VerificationResult(
+                        passed=False,
+                        command=f"node -c {f}",
+                        exit_code=proc.returncode,
+                        stdout=proc.stdout,
+                        stderr=proc.stderr,
+                        error_summary=f"Syntax check failed in {f}:\n{proc.stderr or proc.stdout}",
+                    )
+
+        # 2. Boot Check
+        entrypoint = "server.js"
+        pkg_json = os.path.join(repo_path, "package.json")
+        if os.path.isfile(pkg_json):
+            try:
+                import json
+                with open(pkg_json, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                entrypoint = data.get("main", entrypoint)
+            except Exception:
+                pass
+        
+        entrypoint_path = os.path.join(repo_path, entrypoint)
+        if not os.path.isfile(entrypoint_path):
+            # Check common entrypoints
+            for common in ("server.js", "app.js", "index.js"):
+                if os.path.isfile(os.path.join(repo_path, common)):
+                    entrypoint = common
+                    break
+        
+        entrypoint_path = os.path.join(repo_path, entrypoint)
+        if os.path.isfile(entrypoint_path):
+            self._logger.progress(f"Running boot check: node {entrypoint} (2.0s)...")
+            import time
+            try:
+                proc = subprocess.Popen(
+                    ["node", entrypoint],
+                    cwd=repo_path,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                time.sleep(2.0)
+                poll = proc.poll()
+                if poll is not None and poll != 0:
+                    stdout, stderr = proc.communicate()
+                    return VerificationResult(
+                        passed=False,
+                        command=f"node {entrypoint}",
+                        exit_code=poll,
+                        stdout=stdout,
+                        stderr=stderr,
+                        error_summary=f"Entrypoint boot check crashed:\n{stderr or stdout}",
+                    )
+                else:
+                    # Still running or completed successfully
+                    proc.terminate()
+                    proc.wait()
+            except Exception as e:
+                return VerificationResult(
+                    passed=False,
+                    command=f"node {entrypoint}",
+                    exit_code=-1,
+                    stdout="",
+                    stderr=str(e),
+                    error_summary=f"Failed to start entrypoint: {e}",
+                )
+
+        return VerificationResult(
+            passed=True,
+            command="syntax + boot checks",
+            exit_code=0,
+            stdout="All syntax and boot checks passed successfully.",
+            stderr="",
+            error_summary="",
+        )
 
     def _run_one(self, command: str, cwd: str) -> VerificationResult:
         if not self._is_allowed(command):

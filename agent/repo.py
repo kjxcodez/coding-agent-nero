@@ -7,6 +7,7 @@ wipe/re-clone on target repository change, git diff generation, and changed file
 import os
 import shutil
 import subprocess
+import re
 from typing import Optional, List
 from .config import AgentConfig
 
@@ -27,10 +28,18 @@ class RepositoryManager:
         Resolves or clones target repository into local directory.
         Re-clones automatically if a new URL is provided that differs from active clone.
         """
+        # If dest_dir is already a local directory with files, reuse it immediately
+        if dest_dir and os.path.isdir(dest_dir):
+            if os.path.isdir(os.path.join(dest_dir, ".git")) or os.path.isfile(os.path.join(dest_dir, "package.json")) or os.path.isfile(os.path.join(dest_dir, "pyproject.toml")):
+                return os.path.abspath(dest_dir)
+
         if source.startswith("http://") or source.startswith("https://") or source.endswith(".git") or source.startswith("git@"):
             repo_name = source.rstrip("/").split("/")[-1]
             if repo_name.endswith(".git"):
                 repo_name = repo_name[:-4]
+            
+            # Sanitize repo_name to prevent illegal characters on Windows
+            repo_name = re.sub(r"[^a-zA-Z0-9_\-]", "__", repo_name)
             
             target_dest = os.path.abspath(dest_dir or os.path.join(".", "target_repos", repo_name))
 

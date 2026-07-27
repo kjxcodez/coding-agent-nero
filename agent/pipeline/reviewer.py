@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from ..llm.router import ModelRouter
 from ..utils.logger import AgentLogger
-from .models import ReviewResult
+from .models import ReviewResult, IncrementalPlan
 
 REVIEWER_SYSTEM_PROMPT = """You are NERO's Code Reviewer.
 
@@ -18,6 +18,8 @@ You will receive:
   1. The original user intent (what they asked for)
   2. The active git diff (what was actually changed)
   3. The verification result (did tests pass?)
+  4. The current plan execution status (completed vs pending steps)
+  5. The history of repair attempts (if any failed tests had to be repaired)
 
 Your job is to compare intent vs. implementation and produce a JSON review:
 {
@@ -32,6 +34,8 @@ RULES:
 - "approved" is true if the changes correctly and safely implement the user's intent.
 - "approved" is false if: changes are incomplete, incorrect, introduce bugs,
   have security issues, or significantly deviate from intent.
+- You MUST reject/disapprove if there are pending steps in the plan that were left unexecuted, unless they are redundant.
+- You MUST reject/disapprove if the agent gamed the tests (e.g., editing package.json's test script to pass instead of fixing the actual code).
 - Be concise. "concerns" and "suggestions" max 5 items each.
 - If verification passed, that is evidence in favour of approval (but not sufficient alone).
 - If there is no diff (nothing changed), approved must be false with concern "No changes made".
@@ -51,6 +55,8 @@ class ReviewerAgent:
         diff_text: str,
         verification_passed: bool,
         verification_summary: str = "",
+        plan: Optional[IncrementalPlan] = None,
+        repair_history: Optional[List[str]] = None,
     ) -> ReviewResult:
         if not diff_text.strip():
             self._logger.warning("ReviewerAgent: No diff to review.")
@@ -69,6 +75,16 @@ class ReviewerAgent:
             else f"Verification: FAILED ✗  {verification_summary}"
         )
 
+        plan_status = ""
+        if plan:
+            plan_status = "\n## Plan Status\n"
+            for step in plan.steps:
+                plan_status += f"  - Step {step.id} [{step.status.value}]: {step.description}\n"
+        
+        repair_info = ""
+        if repair_history:
+            repair_info = "\n## Repair History\n" + "\n".join(repair_history) + "\n"
+
         messages: List[Dict[str, Any]] = [
             {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
             {
@@ -76,6 +92,8 @@ class ReviewerAgent:
                 "content": (
                     f"## User Intent\n{user_intent}\n\n"
                     f"## {verif_line}\n\n"
+                    f"{plan_status}\n"
+                    f"{repair_info}\n"
                     f"## Git Diff\n```diff\n{truncated_diff}\n```"
                 ),
             },

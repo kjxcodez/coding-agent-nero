@@ -120,6 +120,7 @@ class RepositoryContext:
 
     def format_context_summary(self) -> str:
         """Rich context block injected into every LLM system message."""
+        import os
         commit_short = self.git_commit[:7] if self.git_commit else "N/A"
         dirty_flag = " [DIRTY]" if self.git_is_dirty else ""
         langs = ", ".join(
@@ -129,7 +130,7 @@ class RepositoryContext:
 
         lines = [
             "=== NERO Repository Intelligence ===",
-            f"Workspace : {self.repo_path}",
+            f"Workspace : [Root] {os.path.basename(self.repo_path)}",
             f"Branch    : {self.git_branch or 'N/A'}  |  Commit: {commit_short}{dirty_flag}",
             f"Language  : {self.primary_language}  ({langs})",
             f"Frameworks: {', '.join(self.detected_frameworks) or 'None detected'}",

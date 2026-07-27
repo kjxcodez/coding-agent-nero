@@ -764,6 +764,54 @@ class TestPhase5(unittest.TestCase):
         mock_chat.assert_called_once()
         self.assertTrue(any("Ask for URL or run clone" in msg for msg in self.logger.messages))
 
+    def test_repair_loop_write_block(self):
+        registry = ToolRegistry(self.config, self.repo_path, memory=self.memory)
+        self.memory.in_repair_loop = True
+
+        # Write initial package.json scripts
+        with open(os.path.join(self.repo_path, "package.json"), "w") as f:
+            f.write(json.dumps({"scripts": {"test": "echo \"Error: no test specified\" && exit 1"}}))
+
+        # Attempt to change test script via write_file
+        res_write = registry.dispatch("write_file", {
+            "path": "package.json",
+            "content": json.dumps({"scripts": {"test": "exit 0"}}),
+        })
+        self.assertIn("ERROR", res_write)
+        self.assertIn("strictly prohibited", res_write)
+
+        # Attempt to change test script via replace_text
+        res_replace = registry.dispatch("replace_text", {
+            "path": "package.json",
+            "old_text": "exit 1",
+            "new_text": "exit 0",
+        })
+        self.assertIn("ERROR", res_replace)
+        self.assertIn("strictly prohibited", res_replace)
+
+    def test_placeholder_test_suite_detection(self):
+        from agent.pipeline.verifier import VerificationEngine
+        verifier = VerificationEngine(self.config, self.logger)
+
+        # Write placeholder package.json
+        with open(os.path.join(self.repo_path, "package.json"), "w") as f:
+            f.write(json.dumps({
+                "scripts": {"test": "echo \"Error: no test specified\" && exit 1"}
+            }))
+
+        is_placeholder = verifier._is_placeholder_test_suite(self.repo_path)
+        self.assertTrue(is_placeholder)
+
+        # Write real framework package.json
+        with open(os.path.join(self.repo_path, "package.json"), "w") as f:
+            f.write(json.dumps({
+                "scripts": {"test": "jest"},
+                "devDependencies": {"jest": "^29.0.0"}
+            }))
+
+        is_placeholder = verifier._is_placeholder_test_suite(self.repo_path)
+        self.assertFalse(is_placeholder)
+
 
 if __name__ == "__main__":
     unittest.main()

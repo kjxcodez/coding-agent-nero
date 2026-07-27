@@ -59,7 +59,10 @@ class ToolLoopExecutor:
         context_summary: str,
         extra_context: str = "",
     ) -> tuple[IncrementalPlan, str]:
-        tool_schemas = self._tools.get_openai_schemas()
+        tool_schemas = [
+            s for s in self._tools.get_openai_schemas()
+            if s["function"]["name"] != "clone_repo"
+        ]
 
         messages: List[Dict[str, Any]] = [
             {"role": "system", "content": EXECUTOR_SYSTEM_PROMPT},

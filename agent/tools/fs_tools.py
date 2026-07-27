@@ -181,6 +181,23 @@ class WriteFileTool(BaseTool):
                 with open(target_file, "r", encoding="utf-8", errors="replace") as fh:
                     prev_content = fh.read()
 
+            if self.memory and getattr(self.memory, "in_repair_loop", False):
+                basename = os.path.basename(path)
+                if basename == "package.json":
+                    try:
+                        import json
+                        orig_json = json.loads(prev_content) if prev_content else {}
+                        upd_json = json.loads(content)
+                        orig_test = orig_json.get("scripts", {}).get("test")
+                        upd_test = upd_json.get("scripts", {}).get("test")
+                        if orig_test != upd_test:
+                            raise ToolError("Modifying verification test scripts in package.json during the repair loop is strictly prohibited.")
+                    except Exception as e:
+                        if "prohibited" in str(e):
+                            raise ToolError(str(e))
+                        if "test" in content or "scripts" in content:
+                            raise ToolError("Modifying verification test scripts in package.json during the repair loop is strictly prohibited.")
+
             os.makedirs(os.path.dirname(target_file), exist_ok=True)
             with open(target_file, "w", encoding="utf-8") as fh:
                 fh.write(content)
@@ -283,6 +300,23 @@ class ReplaceTextTool(BaseTool):
 
             count = original.count(old_text)
             updated = original.replace(old_text, new_text)
+
+            if self.memory and getattr(self.memory, "in_repair_loop", False):
+                basename = os.path.basename(path)
+                if basename == "package.json":
+                    try:
+                        import json
+                        orig_json = json.loads(original)
+                        upd_json = json.loads(updated)
+                        orig_test = orig_json.get("scripts", {}).get("test")
+                        upd_test = upd_json.get("scripts", {}).get("test")
+                        if orig_test != upd_test:
+                            raise ToolError("Modifying verification test scripts in package.json during the repair loop is strictly prohibited.")
+                    except Exception as e:
+                        if "prohibited" in str(e):
+                            raise ToolError(str(e))
+                        if "test" in new_text or "scripts" in new_text:
+                            raise ToolError("Modifying verification test scripts in package.json during the repair loop is strictly prohibited.")
 
             with open(target_file, "w", encoding="utf-8") as fh:
                 fh.write(updated)

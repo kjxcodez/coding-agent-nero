@@ -101,12 +101,13 @@ class PipelineOrchestrator:
             )
 
             repair_attempts = 0
+            repair_history = []
             if not verification.passed:
                 self._logger.warning(
                     f"Verification failed (exit code {verification.exit_code}). "
                     f"Starting repair loop..."
                 )
-                verification, repair_attempts = self._repair.repair(
+                verification, repair_attempts, repair_history = self._repair.repair(
                     plan=plan,
                     failing_result=verification,
                     repo_path=repo_path,
@@ -121,12 +122,23 @@ class PipelineOrchestrator:
                 diff_text=diff_text,
                 verification_passed=verification.passed,
                 verification_summary=verification.error_summary,
+                plan=plan,
+                repair_history=repair_history,
             )
 
         self._logger.markdown(review.format_for_display())
 
+        # Gate on pending steps: if any step is pending, success is False
+        pending_steps = plan.pending_steps()
+        plan_fully_executed = len(pending_steps) == 0
+        if not plan_fully_executed:
+            self._logger.warning(
+                f"Pipeline completed with {len(pending_steps)} pending steps. "
+                "Marking task as incomplete."
+            )
+
         outcome = PipelineOutcome(
-            success=verification.passed and review.approved,
+            success=verification.passed and review.approved and plan_fully_executed,
             plan=plan,
             verification=verification,
             review=review,

@@ -119,6 +119,10 @@ def start_repl_session(
     current_config.repo_path = workspace
     memory = WorkingMemory(repo_path=workspace)
     agent = AgentCore(current_config, memory, logger)
+    try:
+        agent.ensure_repository_context()
+    except Exception as e:
+        logger.warning(f"Initial workspace analysis failed: {e}")
 
     console.print(Panel(
         f"[bold yellow]Working Workspace:[/bold yellow] [bold green]{workspace}[/bold green]\n"
