@@ -286,8 +286,12 @@ class OpenRouterProvider(LLMProvider):
         tool_choice: Optional[str] = None,
         stream: bool = False,
     ) -> LLMResponse:
-        # Strip the "openrouter/" routing prefix — OpenRouter API only wants the bare model ID
-        clean_model = model[len("openrouter/"):] if model.startswith("openrouter/") else model
+        # Strip the "openrouter/" routing prefix for provider-scoped models
+        # e.g. "openrouter/poolside/laguna-s-2.1:free" → "poolside/laguna-s-2.1:free"
+        # BUT keep special OpenRouter router IDs as-is:
+        # e.g. "openrouter/free", "openrouter/auto" → sent unchanged to the API
+        suffix = model[len("openrouter/"):] if model.startswith("openrouter/") else model
+        clean_model = suffix if "/" in suffix else model
         merged_messages = merge_system_messages(messages)
         kwargs: Dict[str, Any] = {
             "model": clean_model,
