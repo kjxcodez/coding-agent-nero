@@ -1,4 +1,15 @@
+```text
+   ███╗   ██╗███████╗██████╗  ██████╗
+   ████╗  ██║██╔════╝██╔══██╗██╔═══██╗
+   ██╔██╗ ██║█████╗  ██████╔╝██║   ██║
+   ██║╚██╗██║██╔══╝  ██╔══██╗██║   ██║
+   ██║ ╚████║███████╗██║  ██║╚██████╔╝
+   ╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+```
+
 # NERO (Evolution Edition) — Autonomous AI Coding Agent CLI
+
+> 📖 **Walkthrough & Demo**: Want to see NERO in action? Check out the step-by-step [Walkthrough & Demo](DEMO.md) featuring a real, unedited execution session!
 
 NERO is an autonomous, agentic command-line assistant designed to analyze, modify, repair, and verify software codebases. It executes a complete planning-execution-verification-review lifecycle directly in your terminal, communicating with leading LLM providers (Google Gemini, OpenAI, Anthropic, and OpenRouter).
 
@@ -118,6 +129,20 @@ graph TD
 3. **Verification**: NERO runs the project test suite or fallbacks (syntax + boot checks).
 4. **Repair**: If tests fail, the Repair Controller triggers a repair loop to fix errors.
 5. **Review**: The Reviewer Agent audits the code changes against the user intent, pending steps, and repair logs, approving or disapproving the work.
+
+---
+
+## Limitations & Known Behaviors
+
+Based on real-world session audits using free-tier LLM providers, keep the following behaviors and limitations in mind:
+
+- **Model Execution Caps (`max_iterations`)**: Weak or free-tier models (e.g. models in `openrouter/free`) may exhaust the iteration limit (default: 15) before emitting a `DONE:` signal. This happens because weaker models tend to repeat file reads rather than acting on existing context. You can increase `max_iterations` in your settings, but using a stronger model (Gemini Flash, GPT-4o, Claude) is highly recommended.
+- **Boot Check Database Dependencies**: NERO's boot check verification (`node server.js` or equivalent) will fail with exit code 1 if the target project depends on an active database (like MongoDB) that isn't running locally. NERO cannot distinguish between code errors and missing host infrastructure.
+  - *Workaround*: Ensure local databases/services are running before launching NERO, or write mock tests so NERO uses `npm test` verification instead.
+- **Ambiguous Prompts**: If NERO is cancelled mid-run, generic follow-ups like "continue" may be classified as general conversation, starting a new context scan instead of resuming. Use the `/resume` command to explicitly pick up where NERO left off.
+- **API Rate Limits**: Standard free-tier keys on OpenRouter have a limit of 50 requests per day. When hit, NERO's fallback chain will attempt to rotate through available models, but if all free models are rate-limited, execution will halt.
+
+For a full breakdown of these behaviors captured in a live test, see the [Demo Walkthrough](demo.md).
 
 ---
 

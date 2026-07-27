@@ -1,5 +1,7 @@
 # NERO — Demo Walkthrough
 
+> 📖 **Main Documentation**: For setup instructions, CLI slash commands, and architecture details, see the main [README.md](README.md).
+
 > **NERO** is an autonomous AI coding agent that explores, plans, executes, verifies, and repairs code changes — all from a single natural-language prompt.
 
 ---
