@@ -110,10 +110,25 @@ After executing the modification plan, NERO confirms the final state of the code
 
 ## Try It Yourself
 
+**1. Clone the repo**
 ```bash
-pip install nero-agent
-
-nero
+git clone https://github.com/kjxcodez/coding-agent-nero
+cd coding-agent-nero
 ```
 
-Point NERO at any repository and describe what you want — in plain English.
+**2. Run the install script**
+
+- **Windows** (PowerShell / CMD):
+  ```cmd
+  install_cli.bat
+  ```
+- **macOS / Linux**:
+  ```bash
+  chmod +x install_cli.sh
+  ./install_cli.sh
+  ```
+
+**3. Launch**
+```bash
+nero
+```

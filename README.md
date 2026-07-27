@@ -127,7 +127,7 @@ To verify that the NERO CLI itself is functioning correctly, run the unit test s
 ```bash
 python -m pytest tests/
 ```
-All 59 unit tests cover safety gates, memory caching, syntax detection, and pipeline executions.
+All 61 unit tests cover safety gates, memory caching, syntax detection, and pipeline executions.
 
 ---
 
