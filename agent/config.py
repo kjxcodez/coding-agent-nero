@@ -97,6 +97,10 @@ class AgentConfig:
     temperature: float = float(_settings.get("temperature", 0.1))
     verbose: bool = bool(_settings.get("verbose", True))
 
+    # Verification overrides (set from CLI; None means use plan commands / auto-detect)
+    verifier_command: str = ""        # If non-empty, used as the sole verification command
+    skip_verification: bool = False   # If True, verification is skipped entirely
+
     # Security & Sandboxing Constraints
     ignored_dirs: Tuple[str, ...] = (
         ".git",
