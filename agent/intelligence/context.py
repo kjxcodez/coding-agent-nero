@@ -7,11 +7,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 
 class SymbolKind(str, Enum):
     """Classification of a code symbol."""
+
     FUNCTION = "function"
     CLASS = "class"
     METHOD = "method"
@@ -25,9 +26,10 @@ class SymbolKind(str, Enum):
 @dataclass
 class SymbolInfo:
     """A single named symbol extracted from a source file."""
+
     name: str
     kind: SymbolKind
-    file: str           # relative path from repo root
+    file: str  # relative path from repo root
     line: int
     signature: str = ""
     docstring: str = ""
@@ -38,17 +40,19 @@ class SymbolInfo:
 @dataclass
 class RouteDefinition:
     """A single HTTP route definition extracted from source code."""
-    method: str     # GET | POST | PUT | PATCH | DELETE | ALL
-    path: str       # e.g. /api/notes/:id
-    handler: str    # function/controller name, if detectable
-    file: str       # relative path from repo root
+
+    method: str  # GET | POST | PUT | PATCH | DELETE | ALL
+    path: str  # e.g. /api/notes/:id
+    handler: str  # function/controller name, if detectable
+    file: str  # relative path from repo root
     line: int
 
 
 @dataclass
 class ArchitectureMap:
     """High-level architectural classification of the repository."""
-    pattern: str                            # e.g. "MVC / REST API Layered"
+
+    pattern: str  # e.g. "MVC / REST API Layered"
     primary_framework: str
     component_graph: Dict[str, List[str]] = field(default_factory=dict)
     data_flow_summary: str = ""
@@ -58,8 +62,8 @@ class ArchitectureMap:
 class RepositoryContext:
     """Unified, persistent knowledge model of a target repository."""
 
-    repo_path: str                          # absolute path
-    git_commit: str = ""                    # HEAD SHA (empty if no git)
+    repo_path: str  # absolute path
+    git_commit: str = ""  # HEAD SHA (empty if no git)
     git_branch: str = ""
     git_is_dirty: bool = False
     analysis_timestamp: str = ""
@@ -72,9 +76,7 @@ class RepositoryContext:
     build_tools: List[str] = field(default_factory=list)
 
     architecture_map: ArchitectureMap = field(
-        default_factory=lambda: ArchitectureMap(
-            pattern="Unknown", primary_framework="Unknown"
-        )
+        default_factory=lambda: ArchitectureMap(pattern="Unknown", primary_framework="Unknown")
     )
 
     entrypoints: List[str] = field(default_factory=list)
@@ -96,12 +98,13 @@ class RepositoryContext:
     @property
     def candidate_edit_locations(self) -> List[str]:
         """Files most likely to need editing for a typical feature request."""
-        return sorted(list(set(
-            self.models[:5]
-            + self.controllers_or_routes[:5]
-            + self.services_or_repos[:5]
-            + self.entrypoints[:3]
-        )))
+        return sorted(
+            list(
+                set(
+                    self.models[:5] + self.controllers_or_routes[:5] + self.services_or_repos[:5] + self.entrypoints[:3]
+                )
+            )
+        )
 
     def find_symbol(self, name: str) -> List[SymbolInfo]:
         """Case-insensitive symbol lookup in the index."""
@@ -112,8 +115,7 @@ class RepositoryContext:
         """Human-readable route table for LLM context injection."""
         if not self.routes:
             return "(no routes detected)"
-        lines = [f"  {r.method:<7} {r.path:<40} → {r.handler} ({r.file}:{r.line})"
-                 for r in self.routes[:20]]
+        lines = [f"  {r.method:<7} {r.path:<40} → {r.handler} ({r.file}:{r.line})" for r in self.routes[:20]]
         if len(self.routes) > 20:
             lines.append(f"  ... and {len(self.routes) - 20} more routes")
         return "\n".join(lines)
@@ -121,12 +123,13 @@ class RepositoryContext:
     def format_context_summary(self) -> str:
         """Rich context block injected into every LLM system message."""
         import os
+
         commit_short = self.git_commit[:7] if self.git_commit else "N/A"
         dirty_flag = " [DIRTY]" if self.git_is_dirty else ""
-        langs = ", ".join(
-            f"{lang}({count})" for lang, count in
-            sorted(self.all_languages.items(), key=lambda x: -x[1])[:5]
-        ) or self.primary_language
+        langs = (
+            ", ".join(f"{lang}({count})" for lang, count in sorted(self.all_languages.items(), key=lambda x: -x[1])[:5])
+            or self.primary_language
+        )
 
         lines = [
             "=== NERO Repository Intelligence ===",
@@ -144,8 +147,10 @@ class RepositoryContext:
             lines.append(f"Entrypoints: {', '.join(self.entrypoints[:5])}")
 
         if self.env_variables:
-            lines.append(f"Env Vars  : {', '.join(self.env_variables[:15])}"
-                         + (f" (+{len(self.env_variables)-15} more)" if len(self.env_variables) > 15 else ""))
+            lines.append(
+                f"Env Vars  : {', '.join(self.env_variables[:15])}"
+                + (f" (+{len(self.env_variables) - 15} more)" if len(self.env_variables) > 15 else "")
+            )
 
         if self.routes:
             lines.append(f"\nAPI Routes ({len(self.routes)} detected):")

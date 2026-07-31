@@ -2,13 +2,14 @@
 Search tools for querying codebase patterns via regex content matching, filename matching, symbol index querying, and route lookup.
 """
 
+import fnmatch
 import os
 import re
-import fnmatch
-from typing import Any, Dict, Optional, List
-from .base import BaseTool, ToolError
-from .safety import ToolSafetyGuard, SecurityError
+from typing import Any, Dict, Optional
+
 from ..config import AgentConfig
+from .base import BaseTool, ToolError
+from .safety import SecurityError, ToolSafetyGuard
 
 
 class SearchCodeContentTool(BaseTool):
@@ -34,8 +35,14 @@ class SearchCodeContentTool(BaseTool):
             "type": "object",
             "properties": {
                 "pattern": {"type": "string", "description": "Regex or substring content pattern to look for."},
-                "path": {"type": "string", "description": "Directory relative to repo root to search. Defaults to '.'."},
-                "file_filter": {"type": "string", "description": "Optional glob filter for filenames (e.g. '*.py' or '*.ts')."}
+                "path": {
+                    "type": "string",
+                    "description": "Directory relative to repo root to search. Defaults to '.'.",
+                },
+                "file_filter": {
+                    "type": "string",
+                    "description": "Optional glob filter for filenames (e.g. '*.py' or '*.ts').",
+                },
             },
             "required": ["pattern"],
         }
@@ -122,8 +129,14 @@ class SearchFilenamesTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "pattern": {"type": "string", "description": "Glob or text pattern to match filenames against (e.g. '*controller*')."},
-                "path": {"type": "string", "description": "Directory relative to repo root to search under. Defaults to '.'."}
+                "pattern": {
+                    "type": "string",
+                    "description": "Glob or text pattern to match filenames against (e.g. '*controller*').",
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Directory relative to repo root to search under. Defaults to '.'.",
+                },
             },
             "required": ["pattern"],
         }
@@ -146,7 +159,11 @@ class SearchFilenamesTool(BaseTool):
                 for f in files:
                     rel_file = os.path.relpath(os.path.join(root, f), self.repo_root).replace(os.sep, "/")
                     # Check match against filename or full path
-                    if fnmatch.fnmatch(f, pattern) or fnmatch.fnmatch(rel_file, pattern) or pattern.lower() in f.lower():
+                    if (
+                        fnmatch.fnmatch(f, pattern)
+                        or fnmatch.fnmatch(rel_file, pattern)
+                        or pattern.lower() in f.lower()
+                    ):
                         matches.append(rel_file)
                         if len(matches) >= max_matches:
                             break
@@ -189,7 +206,10 @@ class SearchSymbolsTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "name": {"type": "string", "description": "Exact or partial name of the symbol (class/function/method) to look up."}
+                "name": {
+                    "type": "string",
+                    "description": "Exact or partial name of the symbol (class/function/method) to look up.",
+                }
             },
             "required": ["name"],
         }
@@ -197,7 +217,7 @@ class SearchSymbolsTool(BaseTool):
     def execute(self, name: str, **kwargs) -> str:
         if not self.memory or not self.memory.repo_context:
             return "ERROR: Symbol index is not initialized. Code context must be scanned first."
-        
+
         ctx = self.memory.repo_context
         matches = ctx.find_symbol(name)
         if not matches:
@@ -214,7 +234,7 @@ class SearchSymbolsTool(BaseTool):
                 lines.append(f"  Signature: {sym.signature}")
             if sym.docstring:
                 lines.append(f"  Docstring: {sym.docstring[:150]}...")
-        
+
         result = "\n".join(lines)
         if len(matches) > 20:
             result += f"\n... (and {len(matches) - 20} more symbols)"
@@ -243,14 +263,17 @@ class SearchRoutesTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "pattern": {"type": "string", "description": "Substring pattern to filter routes by (e.g. '/api/users')."}
+                "pattern": {
+                    "type": "string",
+                    "description": "Substring pattern to filter routes by (e.g. '/api/users').",
+                }
             },
         }
 
     def execute(self, pattern: Optional[str] = None, **kwargs) -> str:
         if not self.memory or not self.memory.repo_context:
             return "ERROR: Route index is not initialized. Code context must be scanned first."
-        
+
         ctx = self.memory.repo_context
         routes = ctx.routes
         if not routes:
@@ -265,8 +288,8 @@ class SearchRoutesTool(BaseTool):
             return f"(no routes match pattern '{pattern}')"
 
         lines = [f"| {'Method':<7} | {'Path':<40} | {'Handler':<25} | {'Location':<20} |"]
-        lines.append(f"|{'-'*9}|{'-'*42}|{'-'*27}|{'-'*22}|")
-        
+        lines.append(f"|{'-' * 9}|{'-' * 42}|{'-' * 27}|{'-' * 22}|")
+
         for r in filtered[:30]:
             lines.append(f"| {r.method:<7} | {r.path:<40} | {r.handler:<25} | {r.file}:{r.line:<5} |")
 

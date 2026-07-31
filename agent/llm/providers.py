@@ -5,27 +5,29 @@ Concrete LLM provider adapters for OpenAI, OpenRouter, Google Gemini, and Anthro
 import json
 import time
 from typing import Any, Dict, List, Optional
-from openai import OpenAI
-import anthropic
 
-from .base import LLMProvider, LLMResponse, ToolCall
+import anthropic
+from openai import OpenAI
+
 from ..config import (
+    ANTHROPIC_API_KEY,
+    GEMINI_API_KEY,
     OPENAI_API_KEY,
     OPENROUTER_API_KEY,
+    OPENROUTER_APP_NAME,
     OPENROUTER_BASE_URL,
     OPENROUTER_SITE_URL,
-    OPENROUTER_APP_NAME,
-    GEMINI_API_KEY,
-    ANTHROPIC_API_KEY,
 )
+from .base import LLMProvider, LLMResponse, ToolCall
+
 
 def _stream_openai_compatible(client: OpenAI, kwargs: Dict[str, Any], model: str) -> LLMResponse:
     """Helper to stream OpenAI-compatible completions (OpenAI, OpenRouter, Google Gemini) and display them in the terminal."""
     from rich.console import Console, Group
-    from rich.markdown import Markdown
-    from rich.text import Text
-    from rich.panel import Panel
     from rich.live import Live
+    from rich.markdown import Markdown
+    from rich.panel import Panel
+    from rich.text import Text
 
     console = Console()
 
@@ -45,9 +47,10 @@ def _stream_openai_compatible(client: OpenAI, kwargs: Dict[str, Any], model: str
 
     try:
         for chunk in response_stream:
-            if not chunk.choices:
+            choices = getattr(chunk, "choices", None)
+            if not choices or not isinstance(choices, (list, tuple)):
                 continue
-            delta = chunk.choices[0].delta
+            delta = choices[0].delta
 
             if is_first_chunk:
                 is_first_chunk = False
@@ -79,7 +82,7 @@ def _stream_openai_compatible(client: OpenAI, kwargs: Dict[str, Any], model: str
             if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                 reasoning_chunk = delta.reasoning_content
                 has_reasoning = True
-            
+
             content_chunk = ""
             if hasattr(delta, "content") and delta.content:
                 content_chunk = delta.content
@@ -156,26 +159,19 @@ def _stream_openai_compatible(client: OpenAI, kwargs: Dict[str, Any], model: str
                 arguments=args,
             )
         )
-        
+
         func_dict = {
             "name": tc_data["name"],
             "arguments": tc_data["arguments"],
         }
         if "thought_signature" in tc_data:
             func_dict["thought_signature"] = tc_data["thought_signature"]
-        tc_item = {
-            "id": tc_data["id"],
-            "type": "function",
-            "function": func_dict
-        }
+        tc_item = {"id": tc_data["id"], "type": "function", "function": func_dict}
         if "thought_signature" in tc_data:
             tc_item["thought_signature"] = tc_data["thought_signature"]
         tool_calls_list.append(tc_item)
 
-    assistant_msg = {
-        "role": "assistant",
-        "content": content_accum if content_accum else None
-    }
+    assistant_msg = {"role": "assistant", "content": content_accum if content_accum else None}
     if tool_calls_list:
         assistant_msg["tool_calls"] = tool_calls_list
 
@@ -290,7 +286,7 @@ class OpenRouterProvider(LLMProvider):
         # e.g. "openrouter/poolside/laguna-s-2.1:free" → "poolside/laguna-s-2.1:free"
         # BUT keep special OpenRouter router IDs as-is:
         # e.g. "openrouter/free", "openrouter/auto" → sent unchanged to the API
-        suffix = model[len("openrouter/"):] if model.startswith("openrouter/") else model
+        suffix = model[len("openrouter/") :] if model.startswith("openrouter/") else model
         clean_model = suffix if "/" in suffix else model
         merged_messages = merge_system_messages(messages)
         kwargs: Dict[str, Any] = {
@@ -332,12 +328,13 @@ class OpenRouterProvider(LLMProvider):
         )
 
 
-import urllib.request
 import urllib.error
+import urllib.request
+
 
 def convert_to_gemini_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
     """Recursively converts OpenAI schema types to Gemini native uppercase types."""
-    res = {}
+    res: Dict[str, Any] = {}
     for k, v in schema.items():
         if k == "type" and isinstance(v, str):
             res[k] = v.upper()
@@ -357,10 +354,7 @@ class GeminiProvider(LLMProvider):
         self.api_key = api_key or GEMINI_API_KEY
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not set. Setup credentials via onboarding or environment.")
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-        )
+        self.client = OpenAI(api_key=self.api_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
 
     def generate(
         self,
@@ -383,16 +377,16 @@ class GeminiProvider(LLMProvider):
                     if msg.get("content"):
                         system_parts.append(msg["content"])
                     continue
-                    
+
                 if "gemini_native_content" in msg:
                     native_content = msg["gemini_native_content"]
                     if native_content and native_content.get("parts"):
                         gemini_contents.append(native_content)
                     continue
-                    
+
                 role = "user" if msg["role"] in ("user", "tool") else "model"
                 parts = []
-                
+
                 if msg["role"] == "assistant":
                     if msg.get("content"):
                         parts.append({"text": msg["content"]})
@@ -408,10 +402,7 @@ class GeminiProvider(LLMProvider):
                                         args = json.loads(args)
                                     except Exception:
                                         args = {}
-                                func_call = {
-                                    "name": func_name,
-                                    "args": args
-                                }
+                                func_call = {"name": func_name, "args": args}
                                 if "thought_signature" in tc:
                                     func_call["thought_signature"] = tc["thought_signature"]
                                 elif "thought_signature" in tc["function"]:
@@ -429,68 +420,51 @@ class GeminiProvider(LLMProvider):
                             break
                     if not tool_name:
                         tool_name = msg.get("name") or "default_api:clone_repo"
-                        
+
                     try:
                         resp_json = json.loads(msg["content"])
                     except Exception:
                         resp_json = {"output": msg["content"]}
-                    parts.append({
-                        "functionResponse": {
-                            "name": tool_name,
-                            "response": resp_json
-                        }
-                    })
+                    parts.append({"functionResponse": {"name": tool_name, "response": resp_json}})
                 else:
                     if msg.get("content"):
                         parts.append({"text": msg["content"]})
-                    
+
                 # Only append the message if it actually contains parts!
                 if parts:
-                    gemini_contents.append({
-                        "role": role,
-                        "parts": parts
-                    })
+                    gemini_contents.append({"role": role, "parts": parts})
 
             # 2. Build REST body
             if not gemini_contents:
-                gemini_contents.append({
-                    "role": "user",
-                    "parts": [{"text": "Start executing the plan."}]
-                })
-            req_body = {
-                "contents": gemini_contents,
-                "generationConfig": {
-                    "temperature": temperature
-                }
-            }
+                gemini_contents.append({"role": "user", "parts": [{"text": "Start executing the plan."}]})
+            req_body = {"contents": gemini_contents, "generationConfig": {"temperature": temperature}}
             if system_parts:
                 req_body["systemInstruction"] = {"parts": [{"text": "\n\n".join(system_parts)}]}
-                
+
             declarations = []
             for tool in tools:
                 if tool.get("type") == "function":
                     func = tool["function"]
-                    declarations.append({
-                        "name": func["name"],
-                        "description": func.get("description", ""),
-                        "parameters": convert_to_gemini_schema(func.get("parameters", {}))
-                    })
+                    declarations.append(
+                        {
+                            "name": func["name"],
+                            "description": func.get("description", ""),
+                            "parameters": convert_to_gemini_schema(func.get("parameters", {})),
+                        }
+                    )
             req_body["tools"] = [{"functionDeclarations": declarations}]
 
             # 3. Post to REST API
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={self.api_key}"
             req_data = json.dumps(req_body).encode("utf-8")
-            
+
             # Retry with exponential backoff for transient 503/429 errors
             max_retries = 4
             last_error: Optional[Exception] = None
             resp_data = None
             for attempt in range(max_retries):
                 req = urllib.request.Request(
-                    url,
-                    data=req_data,
-                    headers={"Content-Type": "application/json"},
-                    method="POST"
+                    url, data=req_data, headers={"Content-Type": "application/json"}, method="POST"
                 )
                 try:
                     with urllib.request.urlopen(req, timeout=45) as resp:
@@ -500,17 +474,17 @@ class GeminiProvider(LLMProvider):
                     error_body = e.read().decode("utf-8")
                     last_error = RuntimeError(f"Gemini Native REST API Error {e.code}: {e.reason}\n{error_body}")
                     if e.code in (503, 429) and attempt < max_retries - 1:
-                        wait = 2 ** attempt  # 1s, 2s, 4s, 8s
+                        wait = 2**attempt  # 1s, 2s, 4s, 8s
                         time.sleep(wait)
                         continue
                     raise last_error
             if resp_data is None:
                 raise last_error or RuntimeError("Gemini REST API returned no data")
-                
+
             candidate = resp_data["candidates"][0]
             content_obj = candidate["content"]
             parts = content_obj.get("parts", [])
-            
+
             content_text = ""
             tool_calls = []
             for part in parts:
@@ -522,7 +496,7 @@ class GeminiProvider(LLMProvider):
                         ToolCall(
                             id=fc.get("thought_signature") or fc["name"],
                             name=fc["name"],
-                            arguments=fc.get("args") or {}
+                            arguments=fc.get("args") or {},
                         )
                     )
 
@@ -531,22 +505,24 @@ class GeminiProvider(LLMProvider):
             for part in parts:
                 if "functionCall" in part:
                     fc = part["functionCall"]
-                    openai_tc.append({
-                        "id": fc.get("thought_signature") or fc["name"],
-                        "type": "function",
-                        "function": {
-                            "name": fc["name"],
-                            "arguments": json.dumps(fc.get("args") or {}),
-                            "thought_signature": fc.get("thought_signature")
-                        },
-                        "thought_signature": fc.get("thought_signature"),
-                        "functionCall": fc
-                    })
-                    
+                    openai_tc.append(
+                        {
+                            "id": fc.get("thought_signature") or fc["name"],
+                            "type": "function",
+                            "function": {
+                                "name": fc["name"],
+                                "arguments": json.dumps(fc.get("args") or {}),
+                                "thought_signature": fc.get("thought_signature"),
+                            },
+                            "thought_signature": fc.get("thought_signature"),
+                            "functionCall": fc,
+                        }
+                    )
+
             assistant_msg = {
                 "role": "assistant",
                 "content": content_text if content_text else None,
-                "gemini_native_content": content_obj
+                "gemini_native_content": content_obj,
             }
             if openai_tc:
                 assistant_msg["tool_calls"] = openai_tc
@@ -571,7 +547,7 @@ class GeminiProvider(LLMProvider):
 
             response = self.client.chat.completions.create(**kwargs)
             msg = response.choices[0].message
-            
+
             return LLMResponse(
                 content=msg.content,
                 tool_calls=[],
@@ -595,11 +571,13 @@ class AnthropicProvider(LLMProvider):
         for tool in openai_tools:
             if tool.get("type") == "function":
                 func = tool["function"]
-                anthropic_tools.append({
-                    "name": func["name"],
-                    "description": func.get("description", ""),
-                    "input_schema": func.get("parameters", {"type": "object", "properties": {}})
-                })
+                anthropic_tools.append(
+                    {
+                        "name": func["name"],
+                        "description": func.get("description", ""),
+                        "input_schema": func.get("parameters", {"type": "object", "properties": {}}),
+                    }
+                )
         return anthropic_tools
 
     def generate(
@@ -623,16 +601,16 @@ class AnthropicProvider(LLMProvider):
             else:
                 role = msg["role"]
                 content = msg["content"]
-                
+
                 if role == "tool":
-                    anthropic_messages.append({
-                        "role": "user",
-                        "content": [{
-                            "type": "tool_result",
-                            "tool_use_id": msg["tool_call_id"],
-                            "content": content
-                        }]
-                    })
+                    anthropic_messages.append(
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "tool_result", "tool_use_id": msg["tool_call_id"], "content": content}
+                            ],
+                        }
+                    )
                 elif "tool_calls" in msg and msg["tool_calls"]:
                     blocks = []
                     if content:
@@ -644,21 +622,12 @@ class AnthropicProvider(LLMProvider):
                                 args = json.loads(args)
                             except Exception:
                                 args = {}
-                        blocks.append({
-                            "type": "tool_use",
-                            "id": tc["id"],
-                            "name": tc["function"]["name"],
-                            "input": args
-                        })
-                    anthropic_messages.append({
-                        "role": "assistant",
-                        "content": blocks
-                    })
+                        blocks.append(
+                            {"type": "tool_use", "id": tc["id"], "name": tc["function"]["name"], "input": args}
+                        )
+                    anthropic_messages.append({"role": "assistant", "content": blocks})
                 else:
-                    anthropic_messages.append({
-                        "role": role,
-                        "content": content
-                    })
+                    anthropic_messages.append({"role": role, "content": content})
 
         system_str = "\n\n".join(system_prompts) if system_prompts else None
 
@@ -691,7 +660,7 @@ class AnthropicProvider(LLMProvider):
             "model": clean_model,
             "messages": anthropic_messages,
             "temperature": temperature,
-            "max_tokens": 4096
+            "max_tokens": 4096,
         }
         if system_str:
             kwargs["system"] = system_str
@@ -702,7 +671,7 @@ class AnthropicProvider(LLMProvider):
             return self._stream_anthropic(kwargs, model)
 
         response = self.client.messages.create(**kwargs)
-        
+
         # Parse content and tool calls
         content_text = ""
         tool_calls: List[ToolCall] = []
@@ -710,28 +679,14 @@ class AnthropicProvider(LLMProvider):
             if block.type == "text":
                 content_text += block.text
             elif block.type == "tool_use":
-                tool_calls.append(
-                    ToolCall(
-                        id=block.id,
-                        name=block.name,
-                        arguments=block.input
-                    )
-                )
+                tool_calls.append(ToolCall(id=block.id, name=block.name, arguments=block.input))
 
         openai_tc = []
         for tc in tool_calls:
-            openai_tc.append({
-                "id": tc.id,
-                "type": "function",
-                "function": {
-                    "name": tc.name,
-                    "arguments": json.dumps(tc.arguments)
-                }
-            })
-        assistant_msg = {
-            "role": "assistant",
-            "content": content_text if content_text else None
-        }
+            openai_tc.append(
+                {"id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)}}
+            )
+        assistant_msg = {"role": "assistant", "content": content_text if content_text else None}
         if openai_tc:
             assistant_msg["tool_calls"] = openai_tc
 
@@ -745,9 +700,9 @@ class AnthropicProvider(LLMProvider):
 
     def _stream_anthropic(self, kwargs: Dict[str, Any], model: str) -> LLMResponse:
         """Helper to stream Anthropic messages and display them in the terminal."""
-        from rich.console import Console, Group
-        from rich.markdown import Markdown
+        from rich.console import Console
         from rich.live import Live
+        from rich.markdown import Markdown
 
         console = Console()
 
@@ -772,16 +727,12 @@ class AnthropicProvider(LLMProvider):
                     if event.type == "content_block_start":
                         block = event.content_block
                         if block.type == "tool_use":
-                            tool_calls_accum[block.id] = {
-                                "id": block.id,
-                                "name": block.name,
-                                "arguments": ""
-                            }
+                            tool_calls_accum[block.id] = {"id": block.id, "name": block.name, "arguments": ""}
                     elif event.type == "content_block_delta":
                         delta = event.delta
                         if delta.type == "text_delta":
                             content_accum += delta.text
-                            
+
                             # Stream to console
                             if live is None:
                                 live = Live(console=console, auto_refresh=False)
@@ -808,26 +759,16 @@ class AnthropicProvider(LLMProvider):
                 args = json.loads(tc_data["arguments"] or "{}")
             except json.JSONDecodeError:
                 args = {}
-            tool_calls.append(
-                ToolCall(
-                    id=tc_data["id"],
-                    name=tc_data["name"],
-                    arguments=args
-                )
-            )
-            openai_tc.append({
-                "id": tc_data["id"],
-                "type": "function",
-                "function": {
-                    "name": tc_data["name"],
-                    "arguments": tc_data["arguments"]
+            tool_calls.append(ToolCall(id=tc_data["id"], name=tc_data["name"], arguments=args))
+            openai_tc.append(
+                {
+                    "id": tc_data["id"],
+                    "type": "function",
+                    "function": {"name": tc_data["name"], "arguments": tc_data["arguments"]},
                 }
-            })
-            
-        assistant_msg = {
-            "role": "assistant",
-            "content": content_accum if content_accum else None
-        }
+            )
+
+        assistant_msg = {"role": "assistant", "content": content_accum if content_accum else None}
         if openai_tc:
             assistant_msg["tool_calls"] = openai_tc
 

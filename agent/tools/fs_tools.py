@@ -3,13 +3,14 @@ File system tools for listing, reading, writing, creating, and replacing text wi
 Optimized for performance and token usage.
 """
 
-import os
 import difflib
+import os
 from datetime import datetime
 from typing import Any, Dict, Optional
-from .base import BaseTool, ToolError
-from .safety import ToolSafetyGuard, SecurityError
+
 from ..config import AgentConfig
+from .base import BaseTool, ToolError
+from .safety import SecurityError, ToolSafetyGuard
 
 
 class ListFilesTool(BaseTool):
@@ -76,7 +77,9 @@ class ReadFileTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Read the contents of a file in the repository, supporting line slices, binary protection, and size limits."
+        return (
+            "Read the contents of a file in the repository, supporting line slices, binary protection, and size limits."
+        )
 
     @property
     def parameters_schema(self) -> Dict[str, Any]:
@@ -99,7 +102,9 @@ class ReadFileTool(BaseTool):
         except Exception:
             return False
 
-    def execute(self, path: Optional[str] = None, start_line: Optional[int] = None, end_line: Optional[int] = None, **kwargs) -> str:
+    def execute(
+        self, path: Optional[str] = None, start_line: Optional[int] = None, end_line: Optional[int] = None, **kwargs
+    ) -> str:
         try:
             if not path:
                 path = kwargs.get("path") or kwargs.get("filepath") or kwargs.get("file")
@@ -114,7 +119,7 @@ class ReadFileTool(BaseTool):
                 raise ToolError(f"Cannot read binary file: {path}")
 
             size = os.path.getsize(target_file)
-            
+
             # If no line range specified, check if full size exceeds limit
             if start_line is None and end_line is None:
                 if size > self.config.max_read_bytes:
@@ -124,17 +129,17 @@ class ReadFileTool(BaseTool):
                     )
                 with open(target_file, "r", encoding="utf-8", errors="replace") as fh:
                     content = fh.read()
-                
+
                 if self.memory:
                     self.memory.cache_file(path, content)
                 return content
-            
+
             # Optimized partial read: read only requested lines
             lines = []
             current_line = 1
             s = start_line if (start_line and start_line > 0) else 1
             e = end_line if (end_line and end_line >= s) else None
-            
+
             with open(target_file, "r", encoding="utf-8", errors="replace") as fh:
                 for line in fh:
                     if current_line >= s:
@@ -142,7 +147,7 @@ class ReadFileTool(BaseTool):
                             break
                         lines.append(line)
                     current_line += 1
-            
+
             return "".join(lines)
 
         except (SecurityError, ToolError) as exc:
@@ -183,12 +188,12 @@ class WriteFileTool(BaseTool):
                 path = kwargs.get("path") or kwargs.get("filepath") or kwargs.get("file")
             if content is None:
                 content = kwargs.get("content") or kwargs.get("contents") or kwargs.get("text")
-            
+
             if not path:
                 raise ToolError("Missing required argument: 'path'")
             if content is None:
                 raise ToolError("Missing required argument: 'content'")
-                
+
             target_file = self.safety.resolve_and_validate_path(self.repo_root, path)
             prev_content = ""
             if os.path.isfile(target_file):
@@ -200,17 +205,22 @@ class WriteFileTool(BaseTool):
                 if basename == "package.json":
                     try:
                         import json
+
                         orig_json = json.loads(prev_content) if prev_content else {}
                         upd_json = json.loads(content)
                         orig_test = orig_json.get("scripts", {}).get("test")
                         upd_test = upd_json.get("scripts", {}).get("test")
                         if orig_test != upd_test:
-                            raise ToolError("Modifying verification test scripts in package.json during the repair loop is strictly prohibited.")
+                            raise ToolError(
+                                "Modifying verification test scripts in package.json during the repair loop is strictly prohibited."
+                            )
                     except Exception as e:
                         if "prohibited" in str(e):
                             raise ToolError(str(e))
                         if "test" in content or "scripts" in content:
-                            raise ToolError("Modifying verification test scripts in package.json during the repair loop is strictly prohibited.")
+                            raise ToolError(
+                                "Modifying verification test scripts in package.json during the repair loop is strictly prohibited."
+                            )
 
             os.makedirs(os.path.dirname(target_file), exist_ok=True)
             with open(target_file, "w", encoding="utf-8") as fh:
@@ -259,10 +269,10 @@ class CreateFileTool(BaseTool):
                 path = kwargs.get("path") or kwargs.get("filepath") or kwargs.get("file")
             if content is None:
                 content = kwargs.get("content") or kwargs.get("contents") or kwargs.get("text") or ""
-            
+
             if not path:
                 raise ToolError("Missing required argument: 'path'")
-                
+
             target_file = self.safety.resolve_and_validate_path(self.repo_root, path)
             if os.path.exists(target_file):
                 raise ToolError(f"File already exists at '{path}'. Use write_file to overwrite.")
@@ -308,22 +318,26 @@ class ReplaceTextTool(BaseTool):
             "required": ["path", "old_text", "new_text"],
         }
 
-    def execute(self, path: Optional[str] = None, old_text: Optional[str] = None, new_text: Optional[str] = None, **kwargs) -> str:
+    def execute(
+        self, path: Optional[str] = None, old_text: Optional[str] = None, new_text: Optional[str] = None, **kwargs
+    ) -> str:
         try:
             if not path:
                 path = kwargs.get("path") or kwargs.get("filepath") or kwargs.get("file")
             if old_text is None:
                 old_text = kwargs.get("old_text") or kwargs.get("old") or kwargs.get("replace") or kwargs.get("target")
             if new_text is None:
-                new_text = kwargs.get("new_text") or kwargs.get("new") or kwargs.get("with") or kwargs.get("replacement")
-                
+                new_text = (
+                    kwargs.get("new_text") or kwargs.get("new") or kwargs.get("with") or kwargs.get("replacement")
+                )
+
             if not path:
                 raise ToolError("Missing required argument: 'path'")
             if old_text is None:
                 raise ToolError("Missing required argument: 'old_text'")
             if new_text is None:
                 raise ToolError("Missing required argument: 'new_text'")
-                
+
             target_file = self.safety.resolve_and_validate_path(self.repo_root, path)
             if not os.path.isfile(target_file):
                 raise ToolError(f"File does not exist: {path}")
@@ -342,30 +356,31 @@ class ReplaceTextTool(BaseTool):
                 if basename == "package.json":
                     try:
                         import json
+
                         orig_json = json.loads(original)
                         upd_json = json.loads(updated)
                         orig_test = orig_json.get("scripts", {}).get("test")
                         upd_test = upd_json.get("scripts", {}).get("test")
                         if orig_test != upd_test:
-                            raise ToolError("Modifying verification test scripts in package.json during the repair loop is strictly prohibited.")
+                            raise ToolError(
+                                "Modifying verification test scripts in package.json during the repair loop is strictly prohibited."
+                            )
                     except Exception as e:
                         if "prohibited" in str(e):
                             raise ToolError(str(e))
                         if "test" in new_text or "scripts" in new_text:
-                            raise ToolError("Modifying verification test scripts in package.json during the repair loop is strictly prohibited.")
+                            raise ToolError(
+                                "Modifying verification test scripts in package.json during the repair loop is strictly prohibited."
+                            )
 
             with open(target_file, "w", encoding="utf-8") as fh:
                 fh.write(updated)
 
             # Generate and return a unified diff snippet for direct verification feedback
             diff_lines = difflib.unified_diff(
-                original.splitlines(),
-                updated.splitlines(),
-                fromfile=f"a/{path}",
-                tofile=f"b/{path}",
-                lineterm=""
+                original.splitlines(), updated.splitlines(), fromfile=f"a/{path}", tofile=f"b/{path}", lineterm=""
             )
-            diff_snippet = "\n".join(list(diff_lines)[:15]) # cap output diff preview
+            diff_snippet = "\n".join(list(diff_lines)[:15])  # cap output diff preview
 
             if self.memory:
                 self.memory.record_edit(path, original, datetime.now().isoformat(), new_content=updated)

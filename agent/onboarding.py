@@ -3,51 +3,63 @@ NERO Onboarding & Setup Wizard.
 Interactively guides the user to set up API keys and default models on first start.
 """
 
+import json
 import os
 import sys
-import json
-import urllib.request
 import urllib.error
-from typing import Dict, Any, Optional
+import urllib.request
+
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Prompt, Confirm
+from rich.prompt import Confirm, Prompt
 
 console = Console()
+
 
 def get_key() -> str:
     """Gets a single keypress from the user cross-platform."""
     if sys.platform == "win32":
         import msvcrt
+
         ch = msvcrt.getch()
-        if ch in (b'\x00', b'\xe0'):
+        if ch in (b"\x00", b"\xe0"):
             ch2 = msvcrt.getch()
-            if ch2 == b'H': return "up"
-            if ch2 == b'P': return "down"
-            if ch2 == b'K': return "left"
-            if ch2 == b'M': return "right"
-        if ch in (b'\r', b'\n'):
+            if ch2 == b"H":
+                return "up"
+            if ch2 == b"P":
+                return "down"
+            if ch2 == b"K":
+                return "left"
+            if ch2 == b"M":
+                return "right"
+        if ch in (b"\r", b"\n"):
             return "enter"
         try:
             return ch.decode("utf-8", errors="ignore")
         except Exception:
             return ""
     else:
-        import tty, termios
+        import termios
+        import tty
+
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
             tty.setraw(sys.stdin.fileno())
             ch = sys.stdin.read(1)
-            if ch == '\x1b':
+            if ch == "\x1b":
                 ch2 = sys.stdin.read(1)
-                if ch2 == '[':
+                if ch2 == "[":
                     ch3 = sys.stdin.read(1)
-                    if ch3 == 'A': return "up"
-                    if ch3 == 'B': return "down"
-                    if ch3 == 'C': return "right"
-                    if ch3 == 'D': return "left"
-            elif ch in ('\r', '\n'):
+                    if ch3 == "A":
+                        return "up"
+                    if ch3 == "B":
+                        return "down"
+                    if ch3 == "C":
+                        return "right"
+                    if ch3 == "D":
+                        return "left"
+            elif ch in ("\r", "\n"):
                 return "enter"
             return ch
         finally:
@@ -68,11 +80,11 @@ def select_option(options: list[str], title: str = "Select:") -> int:
         os.system("")
 
     selected_idx = 0
-    
+
     # Hide cursor
     sys.stdout.write("\033[?25l")
     sys.stdout.flush()
-    
+
     try:
         while True:
             console.print(f"[bold yellow]{title}[/bold yellow]")
@@ -81,7 +93,7 @@ def select_option(options: list[str], title: str = "Select:") -> int:
                     console.print(f"  [bold cyan]❯ ● {opt}[/bold cyan]")
                 else:
                     console.print(f"    ○ {opt}")
-            
+
             key = get_key()
             if key == "up":
                 selected_idx = (selected_idx - 1) % len(options)
@@ -89,10 +101,10 @@ def select_option(options: list[str], title: str = "Select:") -> int:
                 selected_idx = (selected_idx + 1) % len(options)
             elif key == "enter":
                 break
-                
+
             sys.stdout.write(f"\033[{len(options) + 1}A")
             sys.stdout.flush()
-            
+
     except KeyboardInterrupt:
         sys.stdout.write("\033[?25h")
         sys.stdout.flush()
@@ -102,7 +114,7 @@ def select_option(options: list[str], title: str = "Select:") -> int:
         sys.stdout.write("\033[J")
         sys.stdout.write("\033[?25h")
         sys.stdout.flush()
-        
+
     console.print(f"[bold yellow]{title}[/bold yellow] [bold green]{options[selected_idx]}[/bold green]")
     return selected_idx
 
@@ -110,38 +122,34 @@ def select_option(options: list[str], title: str = "Select:") -> int:
 def validate_key(provider: str, api_key: str) -> bool:
     """Validates the API key by making a lightweight request using urllib."""
     console.print(f"[dim]Validating key with {provider}...[/dim]")
-    
+
     if provider == "openrouter":
         url = "https://openrouter.ai/api/v1/auth/key"
         headers = {"Authorization": f"Bearer {api_key}"}
         req = urllib.request.Request(url, headers=headers, method="GET")
     elif provider == "openai":
         url = "https://api.openai.com/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        data = json.dumps({
-            "model": "gpt-4o-mini",
-            "messages": [{"role": "user", "content": "ping"}],
-            "max_tokens": 1
-        }).encode("utf-8")
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        data = json.dumps(
+            {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1}
+        ).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     elif provider == "google":
         # Try multiple Gemini models sequentially to handle 503 Service Unavailable / Spikes
-        models_to_try = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash-lite"]
+        models_to_try = [
+            "gemini-3.5-flash",
+            "gemini-3.6-flash",
+            "gemini-3.1-flash-lite",
+            "gemini-3-flash-preview",
+            "gemini-3.5-flash-lite",
+        ]
         last_err = None
         for m in models_to_try:
             url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            data = json.dumps({
-                "model": m,
-                "messages": [{"role": "user", "content": "ping"}],
-                "max_tokens": 1
-            }).encode("utf-8")
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            data = json.dumps({"model": m, "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1}).encode(
+                "utf-8"
+            )
             req = urllib.request.Request(url, data=data, headers=headers, method="POST")
             try:
                 with urllib.request.urlopen(req, timeout=10) as response:
@@ -167,16 +175,10 @@ def validate_key(provider: str, api_key: str) -> bool:
         return False
     elif provider == "anthropic":
         url = "https://api.anthropic.com/v1/messages"
-        headers = {
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json"
-        }
-        data = json.dumps({
-            "model": "claude-3-5-haiku-20241022",
-            "messages": [{"role": "user", "content": "ping"}],
-            "max_tokens": 1
-        }).encode("utf-8")
+        headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "Content-Type": "application/json"}
+        data = json.dumps(
+            {"model": "claude-3-5-haiku-20241022", "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1}
+        ).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     else:
         return False
@@ -196,6 +198,7 @@ def validate_key(provider: str, api_key: str) -> bool:
         console.print(f"[bold red]Connection error:[/bold red] {e}")
     return False
 
+
 def run_onboarding_if_needed() -> None:
     """Runs interactive setup if no API keys are detected in config/env."""
     from . import config
@@ -212,56 +215,67 @@ def run_onboarding_if_needed() -> None:
     )
     console.print(Panel(welcome_text, title="NERO Setup Wizard", border_style="cyan"))
 
-    providers_list = [
-        "OpenRouter (Access to all models)",
-        "OpenAI",
-        "Google Gemini (AI Studio)",
-        "Anthropic Claude"
-    ]
-    
+    providers_list = ["OpenRouter (Access to all models)", "OpenAI", "Google Gemini (AI Studio)", "Anthropic Claude"]
+
     choice_idx = select_option(providers_list, "Please select a primary provider:")
-    
+
     providers_map = {
-        0: ("openrouter", "OPENROUTER_API_KEY", [
-            "openrouter/poolside/laguna-s-2.1:free",
-            "openrouter/poolside/laguna-m.1:free",
-            "openrouter/google/gemma-4-27b-it:free",
-            "openrouter/cohere/north-mini-code:free",
-            "google/gemini-3.5-flash", "openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"
-        ]),
-        1: ("openai", "OPENAI_API_KEY", [
-            "gpt-4o-mini", "gpt-4o"
-        ]),
-        2: ("google", "GEMINI_API_KEY", [
-            "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-flash-lite"
-        ]),
-        3: ("anthropic", "ANTHROPIC_API_KEY", [
-            "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"
-        ])
+        0: (
+            "openrouter",
+            "OPENROUTER_API_KEY",
+            [
+                "openrouter/poolside/laguna-s-2.1:free",
+                "openrouter/poolside/laguna-m.1:free",
+                "openrouter/google/gemma-4-27b-it:free",
+                "openrouter/cohere/north-mini-code:free",
+                "google/gemini-3.5-flash",
+                "openai/gpt-4o-mini",
+                "anthropic/claude-3-5-sonnet",
+            ],
+        ),
+        1: ("openai", "OPENAI_API_KEY", ["gpt-4o-mini", "gpt-4o"]),
+        2: (
+            "google",
+            "GEMINI_API_KEY",
+            [
+                "gemini-3.5-flash",
+                "gemini-3.6-flash",
+                "gemini-3-flash-preview",
+                "gemini-3.1-pro-preview",
+                "gemini-3.1-flash-lite",
+                "gemini-3.5-flash-lite",
+                "gemini-2.5-flash-lite",
+            ],
+        ),
+        3: ("anthropic", "ANTHROPIC_API_KEY", ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"]),
     }
-    
+
     prov_name, key_name, recommended_models = providers_map[choice_idx]
-    
+
     # Prompt for API Key
     while True:
-        api_key = Prompt.ask(f"Enter your [bold cyan]{prov_name}[/bold cyan] API Key (or press Ctrl+C to exit)", password=True).strip()
+        api_key = Prompt.ask(
+            f"Enter your [bold cyan]{prov_name}[/bold cyan] API Key (or press Ctrl+C to exit)", password=True
+        ).strip()
         if not api_key:
             console.print("[bold red]API Key cannot be empty.[/bold red]")
             continue
-            
+
         validated = validate_key(prov_name, api_key)
         if validated:
             console.print("[bold green]✓ API Key successfully validated![/bold green]")
             break
         else:
-            proceed = Confirm.ask("[bold yellow]API Key validation failed. Proceed anyway?[/bold yellow]", default=False)
+            proceed = Confirm.ask(
+                "[bold yellow]API Key validation failed. Proceed anyway?[/bold yellow]", default=False
+            )
             if proceed:
                 break
 
     # Select Default Model
     model_options = list(recommended_models) + ["Enter custom model name..."]
     model_choice_idx = select_option(model_options, "Select a default model for NERO roles:")
-    
+
     if model_choice_idx < len(recommended_models):
         default_model = recommended_models[model_choice_idx]
     else:
@@ -279,13 +293,25 @@ def run_onboarding_if_needed() -> None:
     if prov_name == "google":
         clean_model = default_model.split("/")[-1]
         model_ref = f"google/{clean_model}"
-        all_gemini = ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "google/gemini-3-flash-preview", "google/gemini-3.5-flash-lite"]
+        all_gemini = [
+            "google/gemini-3.5-flash",
+            "google/gemini-3.6-flash",
+            "google/gemini-3.1-flash-lite",
+            "google/gemini-3-flash-preview",
+            "google/gemini-3.5-flash-lite",
+        ]
         if model_ref in all_gemini:
             all_gemini.remove(model_ref)
         gemini_chain = [model_ref] + all_gemini
-        
+
         planners = gemini_chain + ["openai/gpt-4o-mini", "openrouter/free"]
-        coders = [model_ref, "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest"]
+        coders = [
+            model_ref,
+            "google/gemini-3.6-flash",
+            "google/gemini-3-flash-preview",
+            "openai/gpt-4o",
+            "anthropic/claude-3-5-sonnet-latest",
+        ]
         verifiers = [model_ref, "google/gemini-3.5-flash-lite", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini"]
         reviewers = [model_ref, "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o-mini"]
         summaries = [model_ref, "google/gemini-3.5-flash-lite", "openai/gpt-4o-mini"]
@@ -334,33 +360,35 @@ def run_onboarding_if_needed() -> None:
         "max_iterations": 15,
         "max_repair_attempts": 3,
         "temperature": 0.1,
-        "verbose": True
+        "verbose": True,
     }
     with open(config.SETTINGS_PATH, "w", encoding="utf-8") as f:
         json.dump(settings, f, indent=2)
 
     settings_abs = os.path.abspath(config.SETTINGS_PATH)
     creds_abs = os.path.abspath(config.CREDENTIALS_PATH)
-    
+
     console.print()
-    console.print(Panel(
-        f"[bold green]✓ Configuration successfully saved![/bold green]\n\n"
-        f"  • Settings   : [bold cyan]{settings_abs}[/bold cyan]\n"
-        f"  • Credentials: [bold cyan]{creds_abs}[/bold cyan]",
-        title="[bold green]Setup Complete[/bold green]",
-        border_style="green"
-    ))
+    console.print(
+        Panel(
+            f"[bold green]✓ Configuration successfully saved![/bold green]\n\n"
+            f"  • Settings   : [bold cyan]{settings_abs}[/bold cyan]\n"
+            f"  • Credentials: [bold cyan]{creds_abs}[/bold cyan]",
+            title="[bold green]Setup Complete[/bold green]",
+            border_style="green",
+        )
+    )
 
     # Reload variables in config module so execution can continue
     config.OPENROUTER_API_KEY = credentials.get("OPENROUTER_API_KEY", "")
     config.OPENAI_API_KEY = credentials.get("OPENAI_API_KEY", "")
     config.ANTHROPIC_API_KEY = credentials.get("ANTHROPIC_API_KEY", "")
     config.GEMINI_API_KEY = credentials.get("GEMINI_API_KEY", "")
-    
+
     # Reload AgentConfig default factories
     config._settings = settings
     config._credentials = credentials
-    
+
     console.print("[bold green]Starting NERO session...[/bold green]\n")
 
 
@@ -368,7 +396,7 @@ def resolve_model_with_provider(model_name: str) -> str:
     """Helper to detect provider for a model and prepend prefix if missing."""
     if "/" in model_name:
         return model_name
-    
+
     # Try to detect by name prefix
     if model_name.startswith("gemini-"):
         return f"google/{model_name}"
@@ -376,9 +404,10 @@ def resolve_model_with_provider(model_name: str) -> str:
         return f"openai/{model_name}"
     if model_name.startswith("claude-"):
         return f"anthropic/{model_name}"
-        
+
     # Fallback to configured keys
     from . import config
+
     if config.GEMINI_API_KEY:
         return f"google/{model_name}"
     if config.OPENAI_API_KEY:

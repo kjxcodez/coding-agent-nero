@@ -4,9 +4,10 @@ Command execution tools for running safe, allow-listed test and build commands.
 
 import subprocess
 from typing import Any, Dict, Optional
-from .base import BaseTool, ToolError
-from .safety import ToolSafetyGuard, SecurityError
+
 from ..config import AgentConfig
+from .base import BaseTool
+from .safety import SecurityError, ToolSafetyGuard
 
 
 class RunCommandTool(BaseTool):
@@ -33,9 +34,7 @@ class RunCommandTool(BaseTool):
     def parameters_schema(self) -> Dict[str, Any]:
         return {
             "type": "object",
-            "properties": {
-                "command": {"type": "string", "description": "Command string to execute."}
-            },
+            "properties": {"command": {"type": "string", "description": "Command string to execute."}},
             "required": ["command"],
         }
 

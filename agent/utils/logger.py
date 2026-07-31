@@ -3,26 +3,26 @@ Rich CLI Logger providing subtle progress updates, clean terminal output,
 and structured session-based JSONL file logging under ~/.nero/logs/.
 """
 
-import os
 import json
-import re
+import os
 from datetime import datetime
-from typing import Any, Dict, Optional
-from rich.console import Console
-from rich.panel import Panel
-from rich.markdown import Markdown
-from rich.theme import Theme
-from rich.text import Text
-from rich.rule import Rule
+from typing import Any, Dict
 
-custom_theme = Theme({
-    "info": "dim cyan",
-    "warning": "magenta",
-    "danger": "bold red",
-    "success": "bold green",
-    "progress": "bold bright_blue",
-    "tool": "bold yellow",
-})
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.theme import Theme
+
+custom_theme = Theme(
+    {
+        "info": "dim cyan",
+        "warning": "magenta",
+        "danger": "bold red",
+        "success": "bold green",
+        "progress": "bold bright_blue",
+        "tool": "bold yellow",
+    }
+)
 
 # Tool display config: maps tool name -> (icon, label, color, content_key)
 _READ_TOOLS = {"read_file", "list_files"}
@@ -67,19 +67,17 @@ class AgentLogger:
     def __init__(self, verbose: bool = True):
         self.verbose = verbose
         self.console = Console(theme=custom_theme)
-        
+
         # Initialize session logging
         self.session_id = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
         self.log_dir = os.path.expanduser("~/.nero/logs")
         os.makedirs(self.log_dir, exist_ok=True)
         self.log_file = os.path.join(self.log_dir, f"{self.session_id}.log")
-        
+
         # Log session startup
-        self.log_event("session_started", {
-            "session_id": self.session_id,
-            "os": os.name,
-            "time": datetime.now().isoformat()
-        })
+        self.log_event(
+            "session_started", {"session_id": self.session_id, "os": os.name, "time": datetime.now().isoformat()}
+        )
 
     def print_ascii_art(self) -> None:
         ascii_logo = r"""
@@ -101,11 +99,7 @@ class AgentLogger:
 
     def log_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Appends a structured event into the JSONL session log file."""
-        event = {
-            "timestamp": datetime.now().isoformat(),
-            "event": event_type,
-            **data
-        }
+        event = {"timestamp": datetime.now().isoformat(), "event": event_type, **data}
         try:
             with open(self.log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(event) + "\n")
@@ -127,11 +121,7 @@ class AgentLogger:
 
     def tool(self, tool_name: str, args: Dict[str, Any], result_summary: str) -> None:
         """Renders smart, context-aware tool call output in the terminal."""
-        self.log_event("tool_executed", {
-            "tool": tool_name,
-            "arguments": args,
-            "summary": result_summary
-        })
+        self.log_event("tool_executed", {"tool": tool_name, "arguments": args, "summary": result_summary})
         if not self.verbose:
             return
 
@@ -179,9 +169,7 @@ class AgentLogger:
         elif tool_name == "create_file":
             path = args.get("path") or args.get("file_path") or "?"
             fname = os.path.basename(path)
-            self.console.print(
-                f"  [bold green]✨ Creating[/bold green]  [bold]{fname}[/bold]  [dim]({path})[/dim]"
-            )
+            self.console.print(f"  [bold green]✨ Creating[/bold green]  [bold]{fname}[/bold]  [dim]({path})[/dim]")
         elif tool_name == "replace_text":
             path = args.get("path") or args.get("file_path") or "?"
             fname = os.path.basename(path)
@@ -193,10 +181,7 @@ class AgentLogger:
             )
 
     def _render_search_tool(self, tool_name: str, args: Dict, result: str) -> None:
-        query = (
-            args.get("query") or args.get("pattern") or
-            args.get("name") or args.get("route") or "?"
-        )
+        query = args.get("query") or args.get("pattern") or args.get("name") or args.get("route") or "?"
         hits = len([l for l in result.strip().splitlines() if l.strip()]) if result.strip() else 0
         icons = {
             "search_code_content": "🔍",
@@ -207,8 +192,7 @@ class AgentLogger:
         icon = icons.get(tool_name, "🔍")
         label = tool_name.replace("search_", "").replace("_", " ").title()
         self.console.print(
-            f"  [bold magenta]{icon} Search {label}[/bold magenta]  [dim]\"{query}\"[/dim]  "
-            f"[dim]→ {hits} result(s)[/dim]"
+            f'  [bold magenta]{icon} Search {label}[/bold magenta]  [dim]"{query}"[/dim]  [dim]→ {hits} result(s)[/dim]'
         )
 
     def _render_git_tool(self, tool_name: str, args: Dict, result: str) -> None:
@@ -233,22 +217,18 @@ class AgentLogger:
             cmd = cmd[:57] + "..."
         success = "error" not in result.lower() and "failed" not in result.lower()
         status = "[bold green]✓[/bold green]" if success else "[bold red]✗[/bold red]"
-        self.console.print(
-            f"  [bold bright_blue]⚡ Run[/bold bright_blue]  [dim]{cmd}[/dim]  {status}"
-        )
+        self.console.print(f"  [bold bright_blue]⚡ Run[/bold bright_blue]  [dim]{cmd}[/dim]  {status}")
 
     def _render_clone_tool(self, tool_name: str, args: Dict, result: str) -> None:
         url = args.get("url_or_path") or args.get("url") or "?"
         success = "successfully" in result.lower()
         if success:
             self.console.print(
-                f"  [bold green]⬇  Cloned[/bold green]  [dim]{url}[/dim]\n"
-                f"     [dim]{result.strip()[:100]}[/dim]"
+                f"  [bold green]⬇  Cloned[/bold green]  [dim]{url}[/dim]\n     [dim]{result.strip()[:100]}[/dim]"
             )
         else:
             self.console.print(
-                f"  [bold red]✗  Clone failed[/bold red]  [dim]{url}[/dim]\n"
-                f"     [dim]{result.strip()[:100]}[/dim]"
+                f"  [bold red]✗  Clone failed[/bold red]  [dim]{url}[/dim]\n     [dim]{result.strip()[:100]}[/dim]"
             )
 
     def _render_generic_tool(self, tool_name: str, args: Dict, result: str) -> None:
@@ -257,8 +237,7 @@ class AgentLogger:
             arg_str = arg_str[:57] + "..."
         preview = _collapse(result)
         self.console.print(
-            f"  [bold yellow]⚙  {tool_name}[/bold yellow]  [dim]({arg_str})[/dim]\n"
-            f"     [dim]{preview}[/dim]"
+            f"  [bold yellow]⚙  {tool_name}[/bold yellow]  [dim]({arg_str})[/dim]\n     [dim]{preview}[/dim]"
         )
 
     def success(self, message: str) -> None:
@@ -271,7 +250,9 @@ class AgentLogger:
 
     def error(self, message: str) -> None:
         self.log_event("error", {"message": message})
-        self.console.print(Panel(f"[bold red]{message}[/bold red]", title="[bold red]Error[/bold red]", border_style="red"))
+        self.console.print(
+            Panel(f"[bold red]{message}[/bold red]", title="[bold red]Error[/bold red]", border_style="red")
+        )
 
     def markdown(self, md_text: str) -> None:
         self.log_event("markdown_output", {"content": md_text})
@@ -282,4 +263,3 @@ class AgentLogger:
         """Returns a Rich status spinner context manager."""
         self.log_event("status_spinner", {"message": message})
         return self.console.status(f"[bold green]{message}[/bold green]", spinner="dots")
-

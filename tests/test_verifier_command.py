@@ -15,23 +15,22 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, call, patch
+from typing import List, Optional
+from unittest.mock import MagicMock
 
 from agent.config import AgentConfig
 from agent.pipeline.models import (
     IncrementalPlan,
     PlanStep,
-    PipelineOutcome,
     ReviewResult,
     StepStatus,
     VerificationResult,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_plan(validation_commands: Optional[List[str]] = None) -> IncrementalPlan:
     return IncrementalPlan(
@@ -49,7 +48,6 @@ def _make_plan(validation_commands: Optional[List[str]] = None) -> IncrementalPl
 def _make_orchestrator(config: AgentConfig):
     """Build a PipelineOrchestrator with fully-mocked internals."""
     from agent.pipeline.orchestrator import PipelineOrchestrator
-    from agent.utils.logger import AgentLogger
 
     router = MagicMock()
     tools = MagicMock()
@@ -71,8 +69,8 @@ def _make_orchestrator(config: AgentConfig):
 # 1. AgentConfig field defaults
 # ---------------------------------------------------------------------------
 
-class TestAgentConfigVerifierFields(unittest.TestCase):
 
+class TestAgentConfigVerifierFields(unittest.TestCase):
     def test_verifier_command_default_is_empty_string(self):
         config = AgentConfig()
         self.assertEqual(config.verifier_command, "")
@@ -101,38 +99,44 @@ class TestAgentConfigVerifierFields(unittest.TestCase):
 # 2. build_config() propagation
 # ---------------------------------------------------------------------------
 
-class TestBuildConfigPropagation(unittest.TestCase):
 
+class TestBuildConfigPropagation(unittest.TestCase):
     def test_build_config_without_verifier_command_leaves_empty(self):
         from agent.main import build_config
+
         config = build_config()
         self.assertEqual(config.verifier_command, "")
         self.assertFalse(config.skip_verification)
 
     def test_build_config_with_verifier_command_sets_field(self):
         from agent.main import build_config
+
         config = build_config(verifier_command="pytest")
         self.assertEqual(config.verifier_command, "pytest")
 
     def test_build_config_with_npm_test_command(self):
         from agent.main import build_config
+
         config = build_config(verifier_command="npm test")
         self.assertEqual(config.verifier_command, "npm test")
 
     def test_build_config_skip_verification_propagated(self):
         from agent.main import build_config
+
         config = build_config(skip_verification=True)
         self.assertTrue(config.skip_verification)
 
     def test_build_config_empty_verifier_command_not_set(self):
         """Passing None (the default) must leave verifier_command empty."""
         from agent.main import build_config
+
         config = build_config(verifier_command=None)
         self.assertEqual(config.verifier_command, "")
 
     def test_build_config_with_model_still_propagates_verifier_command(self):
         """with_single_model path must also carry the verifier_command."""
         from agent.main import build_config
+
         config = build_config(model="gpt-4", verifier_command="pytest")
         self.assertEqual(config.verifier_command, "pytest")
 
@@ -140,6 +144,7 @@ class TestBuildConfigPropagation(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # 3. Orchestrator verification stage routing
 # ---------------------------------------------------------------------------
+
 
 class TestOrchestratorVerifierRouting(unittest.TestCase):
     """
@@ -164,18 +169,15 @@ class TestOrchestratorVerifierRouting(unittest.TestCase):
 
         # Mock reviewer to approve everything
         orch._reviewer = MagicMock()
-        orch._reviewer.review.return_value = ReviewResult(
-            approved=True, summary="ok"
-        )
+        orch._reviewer.review.return_value = ReviewResult(approved=True, summary="ok")
 
         # Track verifier calls
         verify_calls = []
+
         def capture_verify(repo_path, commands=None):
             verify_calls.append({"repo_path": repo_path, "commands": commands})
-            return VerificationResult(
-                passed=True, command=str(commands), exit_code=0,
-                stdout="passed", stderr=""
-            )
+            return VerificationResult(passed=True, command=str(commands), exit_code=0, stdout="passed", stderr="")
+
         orch._verifier = MagicMock()
         orch._verifier.verify.side_effect = capture_verify
 
@@ -252,12 +254,13 @@ class TestOrchestratorVerifierRouting(unittest.TestCase):
 # 4. Allow-list security check still applies
 # ---------------------------------------------------------------------------
 
+
 class TestVerifierAllowList(unittest.TestCase):
     """The allow-list must reject commands even when supplied via --verifier-command."""
 
     def test_allowed_command_passes_allow_list(self):
         from agent.pipeline.verifier import VerificationEngine
-        from agent.utils.logger import AgentLogger
+
         config = AgentConfig()
         logger = MagicMock()
         engine = VerificationEngine(config, logger)
@@ -268,6 +271,7 @@ class TestVerifierAllowList(unittest.TestCase):
     def test_disallowed_command_rejected_even_from_cli(self):
         """A dangerous command supplied via --verifier-command must still be rejected."""
         from agent.pipeline.verifier import VerificationEngine
+
         config = AgentConfig()
         config.verifier_command = "rm -rf /"
         logger = MagicMock()
@@ -279,6 +283,7 @@ class TestVerifierAllowList(unittest.TestCase):
     def test_custom_script_rejected_by_allow_list(self):
         """./gradlew test is not on the allow-list and must be rejected."""
         from agent.pipeline.verifier import VerificationEngine
+
         config = AgentConfig()
         logger = MagicMock()
         engine = VerificationEngine(config, logger)
@@ -289,8 +294,8 @@ class TestVerifierAllowList(unittest.TestCase):
 # 5. Repair loop inherits command from current_result.command
 # ---------------------------------------------------------------------------
 
-class TestRepairLoopCommandInheritance(unittest.TestCase):
 
+class TestRepairLoopCommandInheritance(unittest.TestCase):
     def test_repair_loop_uses_command_from_initial_verification(self):
         """
         The repair loop calls verifier.verify(commands=[current_result.command]).
@@ -301,7 +306,7 @@ class TestRepairLoopCommandInheritance(unittest.TestCase):
 
         failing = VerificationResult(
             passed=False,
-            command="npm test",      # ← this is what orchestrator set
+            command="npm test",  # ← this is what orchestrator set
             exit_code=1,
             stdout="1 failing",
             stderr="",

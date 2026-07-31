@@ -14,11 +14,15 @@ from agent.core.intent import Intent, IntentRouter
 from agent.discovery import RepositoryDiscovery
 from agent.intelligence import RepositoryScanner
 from agent.pipeline.models import (
-    StepStatus, PlanStep, IncrementalPlan,
-    VerificationResult, ReviewResult, PipelineOutcome,
+    IncrementalPlan,
+    PipelineOutcome,
+    PlanStep,
+    ReviewResult,
+    StepStatus,
+    VerificationResult,
 )
-from agent.tools.safety import ToolSafetyGuard, SecurityError
 from agent.tools import ToolRegistry
+from agent.tools.safety import SecurityError, ToolSafetyGuard
 from agent.utils.logger import AgentLogger
 
 
@@ -75,8 +79,7 @@ class TestNEROCore(unittest.TestCase):
 
         # record_edit should evict the cache entry
         self.memory.record_edit("src/app.js", "old content", "2026-07-27T12:00:00")
-        self.assertIsNone(self.memory.get_cached_file("src/app.js"),
-                          "Cache entry should be evicted after an edit")
+        self.assertIsNone(self.memory.get_cached_file("src/app.js"), "Cache entry should be evicted after an edit")
 
     def test_tool_registry_with_memory(self):
         registry = ToolRegistry(self.config, self.repo_path, memory=self.memory)
@@ -87,11 +90,14 @@ class TestNEROCore(unittest.TestCase):
         self.assertEqual(self.memory.get_cached_file("src/app.js"), 'console.log("hello world");')
 
         # Test targeted replace_text
-        res_replace = registry.dispatch("replace_text", {
-            "path": "src/app.js",
-            "old_text": 'console.log("hello world");',
-            "new_text": 'console.log("hello NERO");',
-        })
+        res_replace = registry.dispatch(
+            "replace_text",
+            {
+                "path": "src/app.js",
+                "old_text": 'console.log("hello world");',
+                "new_text": 'console.log("hello NERO");',
+            },
+        )
         self.assertIn("Successfully replaced", res_replace)
         # Test clone_repo tool dispatch
         res_clone = registry.dispatch("clone_repo", {"url_or_path": self.repo_path})
@@ -224,8 +230,7 @@ class TestIntentRouter(unittest.TestCase):
         self.assertIsNone(tools, "MODIFY should receive None = all tools")
 
     def test_inline_intents_get_empty_tools(self):
-        for intent in (Intent.STATUS, Intent.DIFF, Intent.UNDO,
-                       Intent.CONTEXT, Intent.ROUTES):
+        for intent in (Intent.STATUS, Intent.DIFF, Intent.UNDO, Intent.CONTEXT, Intent.ROUTES):
             tools = self.router.get_tool_names(intent)
             self.assertEqual(tools, [], f"{intent} should have no tools (inline handler)")
             self.assertTrue(self.router.is_inline(intent))
@@ -278,8 +283,9 @@ class TestIntentRouter(unittest.TestCase):
             ctx = scanner.scan(tmp)
 
             self.assertIn("Flask", ctx.detected_frameworks)
-            self.assertNotIn("Django", ctx.detected_frameworks,
-                             "Django mentioned only in a comment must NOT be detected")
+            self.assertNotIn(
+                "Django", ctx.detected_frameworks, "Django mentioned only in a comment must NOT be detected"
+            )
 
     def test_symbol_index_python_extraction(self):
         """PythonExtractor must correctly index functions and classes."""
@@ -436,9 +442,7 @@ class TestPipeline(unittest.TestCase):
             risks=[],
             created_at="2026-07-27T00:00:00",
         )
-        verification = VerificationResult(
-            passed=True, command="pytest", exit_code=0, stdout="2 passed", stderr=""
-        )
+        verification = VerificationResult(passed=True, command="pytest", exit_code=0, stdout="2 passed", stderr="")
         review = ReviewResult(approved=True, summary="Looks good.")
         outcome = PipelineOutcome(
             success=True,
@@ -456,9 +460,13 @@ class TestPipeline(unittest.TestCase):
     def test_pipeline_outcome_aborted_summary(self):
         plan = IncrementalPlan(
             goal="Add tags",
-            understanding="", approach="", affected_files=[],
+            understanding="",
+            approach="",
+            affected_files=[],
             steps=[PlanStep(id=1, description="(aborted)", status=StepStatus.PENDING)],
-            validation_commands=[], risks=[], created_at="2026-07-27T00:00:00",
+            validation_commands=[],
+            risks=[],
+            created_at="2026-07-27T00:00:00",
         )
         outcome = PipelineOutcome(
             success=False,
@@ -472,20 +480,23 @@ class TestPipeline(unittest.TestCase):
     def test_planner_parses_valid_json(self):
         """Planner must parse valid JSON plan into typed IncrementalPlan."""
         from agent.pipeline.planner import IncrementalPlanner
+
         planner = IncrementalPlanner(router=None)
 
-        raw_json = json.dumps({
-            "goal": "Add tags field to Note model",
-            "understanding": "Need to add a tags array field",
-            "approach": "Edit the Mongoose schema",
-            "affected_files": ["src/models/Note.js"],
-            "steps": [
-                {"id": 1, "description": "Add tags field", "target_files": ["src/models/Note.js"]},
-                {"id": 2, "description": "Update controller", "target_files": ["src/controllers/note.js"]},
-            ],
-            "validation_commands": ["npm test"],
-            "risks": ["May require data migration"],
-        })
+        raw_json = json.dumps(
+            {
+                "goal": "Add tags field to Note model",
+                "understanding": "Need to add a tags array field",
+                "approach": "Edit the Mongoose schema",
+                "affected_files": ["src/models/Note.js"],
+                "steps": [
+                    {"id": 1, "description": "Add tags field", "target_files": ["src/models/Note.js"]},
+                    {"id": 2, "description": "Update controller", "target_files": ["src/controllers/note.js"]},
+                ],
+                "validation_commands": ["npm test"],
+                "risks": ["May require data migration"],
+            }
+        )
         plan = planner._parse_plan(raw_json, model_used="test")
 
         self.assertEqual(plan.goal, "Add tags field to Note model")
@@ -500,6 +511,7 @@ class TestPipeline(unittest.TestCase):
     def test_planner_parses_json_in_markdown_fence(self):
         """Planner must strip markdown code fences before parsing."""
         from agent.pipeline.planner import IncrementalPlanner
+
         planner = IncrementalPlanner(router=None)
 
         raw = '```json\n{"goal": "Fix bug", "steps": [{"id": 1, "description": "Fix it"}]}\n```'
@@ -510,6 +522,7 @@ class TestPipeline(unittest.TestCase):
     def test_planner_raises_on_missing_goal(self):
         """Planner must raise PlannerError if 'goal' is missing."""
         from agent.pipeline.planner import IncrementalPlanner, PlannerError
+
         planner = IncrementalPlanner(router=None)
 
         raw = json.dumps({"steps": [{"id": 1, "description": "Do something"}]})
@@ -519,6 +532,7 @@ class TestPipeline(unittest.TestCase):
     def test_planner_caps_steps_at_12(self):
         """Planner must not produce more than 12 steps."""
         from agent.pipeline.planner import IncrementalPlanner
+
         planner = IncrementalPlanner(router=None)
 
         steps = [{"id": i, "description": f"Step {i}"} for i in range(1, 20)]
@@ -529,6 +543,7 @@ class TestPipeline(unittest.TestCase):
     def test_planner_raises_on_no_json(self):
         """Planner must raise PlannerError if response has no JSON object."""
         from agent.pipeline.planner import IncrementalPlanner, PlannerError
+
         planner = IncrementalPlanner(router=None)
 
         with self.assertRaises(PlannerError):
@@ -537,6 +552,7 @@ class TestPipeline(unittest.TestCase):
     def test_verifier_auto_detects_pytest(self):
         """VerificationEngine must auto-detect pytest for Python projects."""
         from agent.pipeline.verifier import VerificationEngine
+
         config = AgentConfig()
         logger = AgentLogger(verbose=False)
         engine = VerificationEngine(config, logger)
@@ -550,6 +566,7 @@ class TestPipeline(unittest.TestCase):
     def test_verifier_auto_detects_npm(self):
         """VerificationEngine must auto-detect npm test for Node projects."""
         from agent.pipeline.verifier import VerificationEngine
+
         config = AgentConfig()
         logger = AgentLogger(verbose=False)
         engine = VerificationEngine(config, logger)
@@ -563,6 +580,7 @@ class TestPipeline(unittest.TestCase):
     def test_verifier_rejects_disallowed_command(self):
         """VerificationEngine must reject commands not in the allow-list."""
         from agent.pipeline.verifier import VerificationEngine
+
         config = AgentConfig()
         logger = AgentLogger(verbose=False)
         engine = VerificationEngine(config, logger)
@@ -575,6 +593,7 @@ class TestPipeline(unittest.TestCase):
     def test_verifier_extracts_pytest_failures(self):
         """VerificationEngine must extract FAILED test names from output."""
         from agent.pipeline.verifier import VerificationEngine
+
         output = (
             "FAILED tests/test_note.py::test_create_note\n"
             "FAILED tests/test_note.py::test_delete_note\n"
@@ -593,20 +612,26 @@ class TestPhase5(unittest.TestCase):
         self.repo_path = self.temp_dir.name
         self.config = AgentConfig(repo_path=self.repo_path)
         self.memory = WorkingMemory(repo_path=self.repo_path)
-        
+
         class MockLogger:
             def __init__(self):
                 self.messages = []
+
             def markdown(self, text):
                 self.messages.append(text)
+
             def progress(self, text):
                 self.messages.append(text)
+
             def warning(self, text):
                 self.messages.append(text)
+
             def success(self, text):
                 self.messages.append(text)
+
             def error(self, text):
                 self.messages.append(text)
+
             def log_event(self, event_type, data):
                 pass
 
@@ -624,15 +649,17 @@ class TestPhase5(unittest.TestCase):
 
     def test_handle_architecture_query_no_context(self):
         from agent.agent_core import AgentCore
+
         agent = AgentCore(self.config, self.memory, logger=self.logger)
         agent._handle_architecture_query()
         self.assertTrue(any("Repository not yet analyzed" in msg for msg in self.logger.messages))
 
     def test_handle_architecture_query_with_context(self):
         from agent.agent_core import AgentCore
-        from agent.intelligence.context import RepositoryContext, ArchitectureMap
+        from agent.intelligence.context import ArchitectureMap, RepositoryContext
+
         agent = AgentCore(self.config, self.memory, logger=self.logger)
-        
+
         ctx = RepositoryContext(
             repo_path=self.repo_path,
             primary_language="Python",
@@ -641,15 +668,15 @@ class TestPhase5(unittest.TestCase):
             architecture_map=ArchitectureMap(
                 pattern="REST API Layered",
                 primary_framework="FastAPI",
-                component_graph={"routers": ["routes/notes.py"]}
+                component_graph={"routers": ["routes/notes.py"]},
             ),
             entrypoints=["main.py"],
             models=["models.py"],
             env_variables=["DATABASE_URL"],
-            total_files_count=10
+            total_files_count=10,
         )
         self.memory.repo_context = ctx
-        
+
         agent._handle_architecture_query()
         output = "\n".join(self.logger.messages)
         self.assertIn("Repository Architecture", output)
@@ -660,6 +687,7 @@ class TestPhase5(unittest.TestCase):
 
     def test_handle_resume_no_plan(self):
         from agent.agent_core import AgentCore
+
         agent = AgentCore(self.config, self.memory, logger=self.logger)
         agent._handle_resume()
         self.assertTrue(any("No active plan to resume" in msg for msg in self.logger.messages))
@@ -667,8 +695,9 @@ class TestPhase5(unittest.TestCase):
     def test_handle_resume_all_steps_completed(self):
         from agent.agent_core import AgentCore
         from agent.pipeline.models import IncrementalPlan, PlanStep, StepStatus
+
         agent = AgentCore(self.config, self.memory, logger=self.logger)
-        
+
         plan = IncrementalPlan(
             goal="Add tags",
             understanding="",
@@ -677,20 +706,22 @@ class TestPhase5(unittest.TestCase):
             steps=[PlanStep(id=1, description="Step 1", status=StepStatus.COMPLETED)],
             validation_commands=[],
             risks=[],
-            created_at="2026-07-27"
+            created_at="2026-07-27",
         )
         self.memory.current_plan = plan
-        
+
         agent._handle_resume()
         output = "\n".join(self.logger.messages)
         self.assertIn("already complete", output)
 
     def test_handle_resume_runs_executor(self):
+        from unittest.mock import MagicMock
+
         from agent.agent_core import AgentCore
         from agent.pipeline.models import IncrementalPlan, PlanStep, StepStatus
-        from unittest.mock import MagicMock
+
         agent = AgentCore(self.config, self.memory, logger=self.logger)
-        
+
         plan = IncrementalPlan(
             goal="Add tags",
             understanding="",
@@ -699,19 +730,20 @@ class TestPhase5(unittest.TestCase):
             steps=[PlanStep(id=1, description="Step 1", status=StepStatus.PENDING)],
             validation_commands=[],
             risks=[],
-            created_at="2026-07-27"
+            created_at="2026-07-27",
         )
         self.memory.current_plan = plan
-        
+
         from agent.intelligence.context import RepositoryContext
+
         ctx = RepositoryContext(repo_path=self.repo_path)
         self.memory.repo_context = ctx
-        
+
         agent._get_orchestrator = MagicMock()
         mock_executor = MagicMock()
         mock_executor.execute.return_value = (plan, "DONE:")
         agent._get_orchestrator.return_value._executor = mock_executor
-        
+
         agent._handle_resume()
         mock_executor.execute.assert_called_once()
         self.assertTrue(any("Resuming plan" in msg for msg in self.logger.messages))
@@ -723,6 +755,7 @@ class TestPhase5(unittest.TestCase):
 
     def test_process_prompt_no_workspace_error_handled(self):
         from agent.agent_core import AgentCore
+
         non_existent_path = os.path.join(self.repo_path, "does_not_exist")
         self.config.repo_path = non_existent_path
         agent = AgentCore(self.config, self.memory, logger=self.logger)
@@ -733,14 +766,17 @@ class TestPhase5(unittest.TestCase):
         self.assertIn("Clone a repo", output)
 
     def test_process_prompt_no_workspace_conversation(self):
-        from agent.agent_core import AgentCore
         from unittest.mock import MagicMock
+
+        from agent.agent_core import AgentCore
+
         non_existent_path = os.path.join(self.repo_path, "does_not_exist")
         self.config.repo_path = non_existent_path
         agent = AgentCore(self.config, self.memory, logger=self.logger)
 
         mock_chat = MagicMock()
         from agent.llm.base import LLMResponse
+
         mock_chat.return_value = LLMResponse(content="Hello there!", tool_calls=[])
         agent.router.chat = mock_chat
 
@@ -749,14 +785,17 @@ class TestPhase5(unittest.TestCase):
         self.assertTrue(any("Hello there!" in msg for msg in self.logger.messages))
 
     def test_process_prompt_no_workspace_clone_loop(self):
-        from agent.agent_core import AgentCore
         from unittest.mock import MagicMock
+
+        from agent.agent_core import AgentCore
+
         non_existent_path = os.path.join(self.repo_path, "does_not_exist")
         self.config.repo_path = non_existent_path
         agent = AgentCore(self.config, self.memory, logger=self.logger)
 
         mock_chat = MagicMock()
         from agent.llm.base import LLMResponse
+
         mock_chat.return_value = LLMResponse(content="Ask for URL or run clone", tool_calls=[])
         agent.router.chat = mock_chat
 
@@ -770,44 +809,46 @@ class TestPhase5(unittest.TestCase):
 
         # Write initial package.json scripts
         with open(os.path.join(self.repo_path, "package.json"), "w") as f:
-            f.write(json.dumps({"scripts": {"test": "echo \"Error: no test specified\" && exit 1"}}))
+            f.write(json.dumps({"scripts": {"test": 'echo "Error: no test specified" && exit 1'}}))
 
         # Attempt to change test script via write_file
-        res_write = registry.dispatch("write_file", {
-            "path": "package.json",
-            "content": json.dumps({"scripts": {"test": "exit 0"}}),
-        })
+        res_write = registry.dispatch(
+            "write_file",
+            {
+                "path": "package.json",
+                "content": json.dumps({"scripts": {"test": "exit 0"}}),
+            },
+        )
         self.assertIn("ERROR", res_write)
         self.assertIn("strictly prohibited", res_write)
 
         # Attempt to change test script via replace_text
-        res_replace = registry.dispatch("replace_text", {
-            "path": "package.json",
-            "old_text": "exit 1",
-            "new_text": "exit 0",
-        })
+        res_replace = registry.dispatch(
+            "replace_text",
+            {
+                "path": "package.json",
+                "old_text": "exit 1",
+                "new_text": "exit 0",
+            },
+        )
         self.assertIn("ERROR", res_replace)
         self.assertIn("strictly prohibited", res_replace)
 
     def test_placeholder_test_suite_detection(self):
         from agent.pipeline.verifier import VerificationEngine
+
         verifier = VerificationEngine(self.config, self.logger)
 
         # Write placeholder package.json
         with open(os.path.join(self.repo_path, "package.json"), "w") as f:
-            f.write(json.dumps({
-                "scripts": {"test": "echo \"Error: no test specified\" && exit 1"}
-            }))
+            f.write(json.dumps({"scripts": {"test": 'echo "Error: no test specified" && exit 1'}}))
 
         is_placeholder = verifier._is_placeholder_test_suite(self.repo_path)
         self.assertTrue(is_placeholder)
 
         # Write real framework package.json
         with open(os.path.join(self.repo_path, "package.json"), "w") as f:
-            f.write(json.dumps({
-                "scripts": {"test": "jest"},
-                "devDependencies": {"jest": "^29.0.0"}
-            }))
+            f.write(json.dumps({"scripts": {"test": "jest"}, "devDependencies": {"jest": "^29.0.0"}}))
 
         is_placeholder = verifier._is_placeholder_test_suite(self.repo_path)
         self.assertFalse(is_placeholder)
@@ -816,39 +857,31 @@ class TestPhase5(unittest.TestCase):
         registry = ToolRegistry(self.config, self.repo_path, memory=self.memory)
 
         # Test write_file auto-healing (using contents instead of content)
-        res_write = registry.dispatch("write_file", {
-            "path": "src/app.js",
-            "contents": "console.log('auto-healed');"
-        })
+        res_write = registry.dispatch("write_file", {"path": "src/app.js", "contents": "console.log('auto-healed');"})
         self.assertIn("Successfully wrote", res_write)
 
         # Verify it actually wrote the content
-        res_read = registry.dispatch("read_file", {
-            "path": "src/app.js"
-        })
+        res_read = registry.dispatch("read_file", {"path": "src/app.js"})
         self.assertEqual(res_read, "console.log('auto-healed');")
 
         # Test replace_text auto-healing (using replace/with instead of old_text/new_text)
-        res_replace = registry.dispatch("replace_text", {
-            "path": "src/app.js",
-            "replace": "auto-healed",
-            "with": "fully-healed"
-        })
+        res_replace = registry.dispatch(
+            "replace_text", {"path": "src/app.js", "replace": "auto-healed", "with": "fully-healed"}
+        )
         self.assertIn("Successfully replaced", res_replace)
 
         # Verify replacement occurred
-        res_read_final = registry.dispatch("read_file", {
-            "path": "src/app.js"
-        })
+        res_read_final = registry.dispatch("read_file", {"path": "src/app.js"})
         self.assertEqual(res_read_final, "console.log('fully-healed');")
 
     def test_tool_message_name_field(self):
+        from unittest.mock import MagicMock
+
+        from agent.llm.base import LLMResponse, ToolCall
+        from agent.llm.router import ModelRouter
         from agent.pipeline.executor import ToolLoopExecutor
         from agent.pipeline.models import IncrementalPlan, PlanStep
-        from unittest.mock import MagicMock
-        from agent.llm.base import LLMResponse, ToolCall
-        
-        from agent.llm.router import ModelRouter
+
         router = ModelRouter(self.config)
         self.logger.tool = lambda name, args, snippet: None
         executor = ToolLoopExecutor(router, ToolRegistry(self.config, self.repo_path), self.logger)
@@ -860,29 +893,28 @@ class TestPhase5(unittest.TestCase):
             steps=[PlanStep(id=1, description="test")],
             validation_commands=[],
             risks=[],
-            created_at="2026-07-27"
+            created_at="2026-07-27",
         )
-        
+
         mock_response = LLMResponse(
             content=None,
             tool_calls=[ToolCall(id="call_test", name="read_file", arguments={"path": "package.json"})],
             model_used="test_model",
-            assistant_message={"role": "assistant", "content": None, "tool_calls": []}
+            assistant_message={"role": "assistant", "content": None, "tool_calls": []},
         )
-        
-        executor._router.chat = MagicMock(side_effect=[
-            mock_response,
-            LLMResponse(content="DONE", tool_calls=[], model_used="test_model")
-        ])
-        
+
+        executor._router.chat = MagicMock(
+            side_effect=[mock_response, LLMResponse(content="DONE", tool_calls=[], model_used="test_model")]
+        )
+
         with open(os.path.join(self.repo_path, "package.json"), "w") as f:
             f.write("{}")
-            
+
         executor.execute(plan, "context")
-        
+
         called_args = executor._router.chat.call_args_list
         messages_sent = called_args[1][0][1]
-        
+
         tool_msg = next((m for m in messages_sent if m.get("role") == "tool"), None)
         self.assertIsNotNone(tool_msg)
         self.assertEqual(tool_msg.get("name"), "read_file")

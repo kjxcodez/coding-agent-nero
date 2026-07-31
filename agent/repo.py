@@ -5,15 +5,17 @@ wipe/re-clone on target repository change, git diff generation, and changed file
 """
 
 import os
+import re
 import shutil
 import subprocess
-import re
-from typing import Optional, List
+from typing import List, Optional
+
 from .config import AgentConfig
 
 
 class RepositoryError(Exception):
     """Exception raised for git repository operation failures."""
+
     pass
 
 
@@ -30,17 +32,26 @@ class RepositoryManager:
         """
         # If dest_dir is already a local directory with files, reuse it immediately
         if dest_dir and os.path.isdir(dest_dir):
-            if os.path.isdir(os.path.join(dest_dir, ".git")) or os.path.isfile(os.path.join(dest_dir, "package.json")) or os.path.isfile(os.path.join(dest_dir, "pyproject.toml")):
+            if (
+                os.path.isdir(os.path.join(dest_dir, ".git"))
+                or os.path.isfile(os.path.join(dest_dir, "package.json"))
+                or os.path.isfile(os.path.join(dest_dir, "pyproject.toml"))
+            ):
                 return os.path.abspath(dest_dir)
 
-        if source.startswith("http://") or source.startswith("https://") or source.endswith(".git") or source.startswith("git@"):
+        if (
+            source.startswith("http://")
+            or source.startswith("https://")
+            or source.endswith(".git")
+            or source.startswith("git@")
+        ):
             repo_name = source.rstrip("/").split("/")[-1]
             if repo_name.endswith(".git"):
                 repo_name = repo_name[:-4]
-            
+
             # Sanitize repo_name to prevent illegal characters on Windows
             repo_name = re.sub(r"[^a-zA-Z0-9_\-]", "__", repo_name)
-            
+
             target_dest = os.path.abspath(dest_dir or os.path.join(".", "target_repos", repo_name))
 
             if os.path.isdir(target_dest) and os.path.isdir(os.path.join(target_dest, ".git")):
@@ -52,7 +63,9 @@ class RepositoryManager:
 
             os.makedirs(os.path.dirname(target_dest), exist_ok=True)
             try:
-                subprocess.run(["git", "clone", source, target_dest], check=True, capture_output=True, text=True, errors="replace")
+                subprocess.run(
+                    ["git", "clone", source, target_dest], check=True, capture_output=True, text=True, errors="replace"
+                )
                 return target_dest
             except subprocess.CalledProcessError as exc:
                 # Handle bytes vs str in CalledProcessError stderr
@@ -97,7 +110,7 @@ class RepositoryManager:
         try:
             subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
             subprocess.run(["git", "add", "-A"], cwd=repo_path, check=True, capture_output=True)
-            
+
             # Set temporary Git environment variables to prevent commit failures if git is unconfigured globally
             env = os.environ.copy()
             env["GIT_AUTHOR_NAME"] = "NERO Agent"
@@ -114,9 +127,7 @@ class RepositoryManager:
             )
         except subprocess.CalledProcessError as exc:
             stderr = exc.stderr.decode(errors="ignore") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-            raise RepositoryError(
-                f"Failed to create git baseline in {repo_path}: {stderr.strip()}"
-            ) from exc
+            raise RepositoryError(f"Failed to create git baseline in {repo_path}: {stderr.strip()}") from exc
 
     def get_diff(self, repo_path: str) -> str:
         """Retrieves active git diff including untracked files."""

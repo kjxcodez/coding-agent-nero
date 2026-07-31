@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from ..llm.router import ModelRouter
 from ..utils.logger import AgentLogger
-from .models import ReviewResult, IncrementalPlan
+from .models import IncrementalPlan, ReviewResult
 
 REVIEWER_SYSTEM_PROMPT = """You are NERO's Code Reviewer.
 
@@ -70,9 +70,7 @@ class ReviewerAgent:
         truncated_diff = diff_text[-8000:] if len(diff_text) > 8000 else diff_text
 
         verif_line = (
-            f"Verification: PASSED ✓"
-            if verification_passed
-            else f"Verification: FAILED ✗  {verification_summary}"
+            "Verification: PASSED ✓" if verification_passed else f"Verification: FAILED ✗  {verification_summary}"
         )
 
         plan_status = ""
@@ -80,7 +78,7 @@ class ReviewerAgent:
             plan_status = "\n## Plan Status\n"
             for step in plan.steps:
                 plan_status += f"  - Step {step.id} [{step.status.value}]: {step.description}\n"
-        
+
         repair_info = ""
         if repair_history:
             repair_info = "\n## Repair History\n" + "\n".join(repair_history) + "\n"
@@ -114,7 +112,7 @@ class ReviewerAgent:
     def _parse_review(self, raw: str) -> ReviewResult:
         # Strip thinking blocks first
         cleaned = re.sub(r"<think>[\s\S]*?</think>", "", raw).strip()
-        
+
         fence_match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", cleaned, re.I)
         if fence_match:
             cleaned = fence_match.group(1).strip()

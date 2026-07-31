@@ -4,19 +4,17 @@ Comprehensive unit tests for the language-agnostic verification fallback system 
 
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
 from agent.config import AgentConfig
-from agent.pipeline.verifier import VerificationEngine
 from agent.pipeline.models import VerificationResult
+from agent.pipeline.verifier import VerificationEngine
 
 
 class TestVerifierAgnostic(unittest.TestCase):
-
     def setUp(self):
         self.config = AgentConfig()
         self.logger = MagicMock()
@@ -149,49 +147,54 @@ class TestVerifierAgnostic(unittest.TestCase):
     def test_is_missing_test_error_classification(self):
         # pytest missing tests
         res = VerificationResult(
-            passed=False, command="pytest", exit_code=1,
-            stdout="collected 0 items / 1 error", stderr=""
+            passed=False, command="pytest", exit_code=1, stdout="collected 0 items / 1 error", stderr=""
         )
         self.assertTrue(self.engine._is_missing_test_error(res))
 
         # actual test failure
         res2 = VerificationResult(
-            passed=False, command="pytest", exit_code=1,
-            stdout="FAILED tests/test_foo.py::test_bar", stderr=""
+            passed=False, command="pytest", exit_code=1, stdout="FAILED tests/test_foo.py::test_bar", stderr=""
         )
         self.assertFalse(self.engine._is_missing_test_error(res2))
 
     def test_classify_failure_syntax_error(self):
         res = VerificationResult(
-            passed=False, command="pytest", exit_code=1,
-            stdout="SyntaxError: invalid syntax", stderr=""
+            passed=False, command="pytest", exit_code=1, stdout="SyntaxError: invalid syntax", stderr=""
         )
         self.assertEqual(self.engine._classify_failure(res), "Syntax Error")
 
     def test_classify_failure_missing_dependency(self):
         res = VerificationResult(
-            passed=False, command="node index.js", exit_code=1,
-            stdout="Error: Cannot find module 'express'", stderr=""
+            passed=False, command="node index.js", exit_code=1, stdout="Error: Cannot find module 'express'", stderr=""
         )
         self.assertEqual(self.engine._classify_failure(res), "Missing Dependency")
 
     def test_classify_failure_missing_database(self):
         res = VerificationResult(
-            passed=False, command="pytest", exit_code=1,
-            stdout="sqlite3.OperationalError: no such table: notes", stderr=""
+            passed=False,
+            command="pytest",
+            exit_code=1,
+            stdout="sqlite3.OperationalError: no such table: notes",
+            stderr="",
         )
         self.assertEqual(self.engine._classify_failure(res), "Missing Database")
 
         res2 = VerificationResult(
-            passed=False, command="node server.js", exit_code=1,
-            stdout="MongooseServerSelectionError: connect ECONNREFUSED 127.0.0.1:27017", stderr=""
+            passed=False,
+            command="node server.js",
+            exit_code=1,
+            stdout="MongooseServerSelectionError: connect ECONNREFUSED 127.0.0.1:27017",
+            stderr="",
         )
         self.assertEqual(self.engine._classify_failure(res2), "Missing Database")
 
     def test_populate_result_bypasses_missing_database(self):
         res = VerificationResult(
-            passed=False, command="node server.js", exit_code=1,
-            stdout="MongooseServerSelectionError: connect ECONNREFUSED 127.0.0.1:27017", stderr=""
+            passed=False,
+            command="node server.js",
+            exit_code=1,
+            stdout="MongooseServerSelectionError: connect ECONNREFUSED 127.0.0.1:27017",
+            stderr="",
         )
         populated = self.engine._populate_result(res)
         self.assertTrue(populated.passed)

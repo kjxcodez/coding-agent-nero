@@ -31,27 +31,25 @@ def _merge_consecutive(anthropic_messages: List[Dict[str, Any]]) -> List[Dict[st
 
 
 class TestAnthropicMergeLogic(unittest.TestCase):
-
     def test_two_consecutive_tool_results_merged(self):
         """Two consecutive tool results (role=user) must be merged into one user message."""
         msgs = [
-            {"role": "user",      "content": "Hello"},
+            {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": [{"type": "tool_use", "id": "id1", "name": "read_file", "input": {}}]},
-            {"role": "user",      "content": [{"type": "tool_result", "tool_use_id": "id1", "content": "result1"}]},
-            {"role": "user",      "content": [{"type": "tool_result", "tool_use_id": "id2", "content": "result2"}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "id1", "content": "result1"}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "id2", "content": "result2"}]},
         ]
         result = _merge_consecutive(msgs)
         self.assertEqual(len(result), 3, "Expected 3 messages after merge")
         self.assertEqual(result[2]["role"], "user")
-        self.assertEqual(len(result[2]["content"]), 2,
-                         "Both tool_result blocks should be merged into one message")
+        self.assertEqual(len(result[2]["content"]), 2, "Both tool_result blocks should be merged into one message")
 
     def test_single_tool_result_unchanged(self):
         """A single tool result should not be merged with anything."""
         msgs = [
-            {"role": "user",      "content": "Hello"},
+            {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": [{"type": "tool_use", "id": "id1", "name": "read_file", "input": {}}]},
-            {"role": "user",      "content": [{"type": "tool_result", "tool_use_id": "id1", "content": "result1"}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "id1", "content": "result1"}]},
         ]
         result = _merge_consecutive(msgs)
         self.assertEqual(len(result), 3)
@@ -68,23 +66,24 @@ class TestAnthropicMergeLogic(unittest.TestCase):
     def test_three_consecutive_tool_results_merged_into_one(self):
         """Three consecutive tool results must all merge into a single user message."""
         msgs = [
-            {"role": "user",      "content": "Hello"},
+            {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": [{"type": "tool_use"}]},
-            {"role": "user",      "content": [{"type": "tool_result", "tool_use_id": "id1", "content": "r1"}]},
-            {"role": "user",      "content": [{"type": "tool_result", "tool_use_id": "id2", "content": "r2"}]},
-            {"role": "user",      "content": [{"type": "tool_result", "tool_use_id": "id3", "content": "r3"}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "id1", "content": "r1"}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "id2", "content": "r2"}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "id3", "content": "r3"}]},
         ]
         result = _merge_consecutive(msgs)
         self.assertEqual(len(result), 3)
-        self.assertEqual(len(result[2]["content"]), 3,
-                         "All three tool_result blocks must be in the single merged user message")
+        self.assertEqual(
+            len(result[2]["content"]), 3, "All three tool_result blocks must be in the single merged user message"
+        )
 
     def test_alternating_roles_unchanged(self):
         """Properly alternating messages should pass through the merge step unchanged."""
         msgs = [
-            {"role": "user",      "content": "Hello"},
+            {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there!"},
-            {"role": "user",      "content": "Continue"},
+            {"role": "user", "content": "Continue"},
             {"role": "assistant", "content": "Done"},
         ]
         result = _merge_consecutive(msgs)

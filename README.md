@@ -146,13 +146,86 @@ For a full breakdown of these behaviors captured in a live test, see the [Demo W
 
 ---
 
-## Running Tests
+## Running Tests & Static Analysis
 
-To verify that the NERO CLI itself is functioning correctly, run the unit test suite:
+Before submitting pull requests or making releases, verify repository integrity locally:
+
+### 1. Setup Dev Dependencies
+Install the package along with its optional development dependencies:
 ```bash
-python -m pytest tests/
+pip install -e .[dev]
 ```
-All 61 unit tests cover safety gates, memory caching, syntax detection, and pipeline executions.
+
+### 2. Run Linting and Formatting Check
+We use `ruff` for fast python linting and code formatting validation:
+```bash
+# Check code style issues and fixes
+ruff check agent/ tests/
+
+# Validate formatting
+ruff format --check agent/ tests/
+```
+
+### 3. Run Static Type Checking
+We use `mypy` for static type verification:
+```bash
+mypy agent/
+```
+
+### 4. Run Dependency Security Audit
+We use `pip-audit` to detect known CVE vulnerabilities in our dependency tree:
+```bash
+pip-audit
+```
+
+### 5. Run the Test Suite
+Verify that the NERO CLI functioning and verifications pass successfully:
+```bash
+python -m pytest
+```
+
+---
+
+## Development & CI/CD Pipeline
+
+NERO maintains a production-grade automated engineering pipeline:
+
+### 1. CI Pipeline (`ci.yml`)
+Runs automatically on every push or pull request on all branches across **Ubuntu**, **Windows**, and **macOS** on Python **3.8, 3.9, 3.10, 3.11, and 3.12**:
+1. Checks formatting & lint rules (`ruff`).
+2. Runs static type validation (`mypy`).
+3. Conducts security vulnerability check (`pip-audit`).
+4. Verifies the package builds cleanly (`python -m build`).
+5. Performs CLI Smoke Tests (installs from wheel, runs `nero --version` and `nero --help`).
+6. Executes the entire unit test suite (`pytest`).
+
+### 2. Release & Changelog Pipeline (`release.yml`)
+When a version tag (e.g. `v1.0.1`) is pushed:
+1. Triggers the automated changelog script to parse conventional commits since the last tag.
+2. Commits and pushes the updated `CHANGELOG.md` directly to `main`.
+3. Builds source and binary wheel distributions.
+4. Generates a new GitHub Release, attaches the built wheel and tarball assets, and populates the release description with conventional release notes.
+
+### 3. Versioning Strategy
+We adhere to **Semantic Versioning (SemVer)** (e.g., `MAJOR.MINOR.PATCH`).
+To release a new version:
+1. Update the version number in `pyproject.toml`.
+2. Commit the change.
+3. Tag the commit (e.g., `git tag v1.0.1`).
+4. Push the tag to trigger the Release Pipeline:
+   ```bash
+   git push origin v1.0.1
+   ```
+
+### 4. Manual Changelog Generation
+You can also preview or generate the changelog locally:
+```bash
+# Preview changes since the last tag (dry run)
+python scripts/generate_changelog.py --release-version v1.0.1 --dry-run
+
+# Write updates to CHANGELOG.md locally
+python scripts/generate_changelog.py --release-version v1.0.1
+```
 
 ---
 
@@ -164,3 +237,4 @@ This project is licensed under the MIT License — see the [LICENSE](file:///C:/
 
 ### 💸 API Budget Disclaimer / Sponsor Call
 Google Gemini and OpenRouter integrations are fully tested and verified. However, **no money** was left to verify OpenAI and Anthropic integrations (our developer pockets are dry!). If you want to sponsor our API keys or verify those providers for us, check out the disclaimer in [CONTRIBUTING.md](file:///C:/Users/91637/Desktop/Projects/coding-agent-nero/CONTRIBUTING.md)!
+

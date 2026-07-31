@@ -5,11 +5,11 @@ Unit tests for configuration validation system and model cleanup (P2.2).
 from __future__ import annotations
 
 import unittest
+
 from agent.config import AgentConfig, ConfigValidationError
 
 
 class TestConfigValidation(unittest.TestCase):
-
     def test_default_config_is_valid(self):
         """Default configuration must pass validation successfully."""
         config = AgentConfig()

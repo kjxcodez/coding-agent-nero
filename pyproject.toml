@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nero-agent"
 version = "1.0.0"
-description = "NERO Autonomous AI Coding Agent CLI — Interactive REPL & Command Engine."
+description = "NERO Autonomous AI Coding Agent CLI - Interactive REPL & Command Engine."
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
@@ -16,9 +16,33 @@ dependencies = [
     "anthropic>=0.18.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-timeout>=2.2.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.3.0",
+    "mypy>=1.9.0",
+    "build>=1.1.0",
+    "pip-audit>=2.7.0",
+]
+
 [project.scripts]
 nero = "agent.main:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["agent*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501", "E741", "E402", "F841", "W291"]
+
+[tool.mypy]
+ignore_missing_imports = true
+disable_error_code = ["no-any-return", "arg-type", "assignment", "override", "var-annotated", "abstract", "union-attr", "call-overload"]

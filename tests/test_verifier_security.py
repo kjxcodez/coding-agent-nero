@@ -4,17 +4,14 @@ Unit tests for P1.5 fix: removing shell=True and adding strict shell character r
 
 from __future__ import annotations
 
-import os
-import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
 from agent.config import AgentConfig
-from agent.pipeline.verifier import VerificationEngine, VerificationResult
+from agent.pipeline.verifier import VerificationEngine
 
 
 class TestVerifierSecurity(unittest.TestCase):
-
     def setUp(self):
         self.config = AgentConfig()
         # Ensure standard prefixes are set

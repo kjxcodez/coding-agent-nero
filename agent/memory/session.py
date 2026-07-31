@@ -22,6 +22,7 @@ class ConversationTurn:
 @dataclass
 class GitState:
     """Snapshot of git state at session start."""
+
     branch: str = "unknown"
     baseline_commit: str = ""
     current_commit: str = ""
@@ -182,7 +183,8 @@ class SessionMemory:
 
         repo_line = (
             f"{ctx.primary_language} / {', '.join(ctx.detected_frameworks) or 'no framework'}"
-            if ctx else "Not yet analyzed"
+            if ctx
+            else "Not yet analyzed"
         )
         git_line = (
             f"Branch: {git.branch}  "

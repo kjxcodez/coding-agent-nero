@@ -2,7 +2,7 @@
 WorkingMemory backward-compatibility shim.
 """
 
-from .memory.session import SessionMemory, ConversationTurn
+from .memory.session import ConversationTurn, SessionMemory
 
 WorkingMemory = SessionMemory
 

@@ -14,9 +14,8 @@ from .core.intent import Intent, IntentRouter
 from .intelligence.context import RepositoryContext
 from .intelligence.scanner import RepositoryScanner
 from .llm.router import ModelRouter
-from .memory import SessionMemory
 from .pipeline import PipelineOrchestrator
-from .repo import RepositoryError, RepositoryManager
+from .repo import RepositoryManager
 from .tools import ToolRegistry
 from .utils.logger import AgentLogger
 
@@ -80,31 +79,20 @@ class AgentCore:
     def ensure_repository_context(self) -> RepositoryContext:
         current_abs = os.path.abspath(self.config.repo_path)
 
-        if (
-            self.memory.repo_context is None
-            or self.memory.repo_context.repo_path != current_abs
-        ):
-            self.logger.progress(
-                "Building repository intelligence map (routes · symbols · env)..."
-            )
-            abs_path = self.repo_mgr.prepare_repository(
-                self.memory.repo_path, self.config.repo_path
-            )
+        if self.memory.repo_context is None or self.memory.repo_context.repo_path != current_abs:
+            self.logger.progress("Building repository intelligence map (routes · symbols · env)...")
+            abs_path = self.repo_mgr.prepare_repository(self.memory.repo_path, self.config.repo_path)
             self.memory.repo_context = self._scanner.scan(abs_path)
             self.memory.repo_path = abs_path
             self.memory.capture_git_state()
 
-            self._tool_registry = ToolRegistry(
-                self.config, abs_path, memory=self.memory
-            )
+            self._tool_registry = ToolRegistry(self.config, abs_path, memory=self.memory)
 
         return self.memory.repo_context
 
     def _get_tool_registry(self, ctx: RepositoryContext) -> ToolRegistry:
         if self._tool_registry is None:
-            self._tool_registry = ToolRegistry(
-                self.config, ctx.repo_path, memory=self.memory
-            )
+            self._tool_registry = ToolRegistry(self.config, ctx.repo_path, memory=self.memory)
         return self._tool_registry
 
     def _get_orchestrator(self, ctx: RepositoryContext) -> PipelineOrchestrator:
@@ -124,14 +112,14 @@ class AgentCore:
         self.logger.log_event("intent_classified", {"prompt": user_prompt, "intent": intent.value})
 
         inline_dispatch = {
-            Intent.STATUS:        self._handle_status_query,
-            Intent.HELP:         self._handle_help_query,
-            Intent.DIFF:          self._handle_diff_query,
-            Intent.UNDO:          self._handle_undo,
-            Intent.ARCHITECTURE:  self._handle_architecture_query,
-            Intent.RESUME:        self._handle_resume,
-            Intent.CONTEXT:       self._handle_context_query,
-            Intent.ROUTES:        self._handle_routes_query,
+            Intent.STATUS: self._handle_status_query,
+            Intent.HELP: self._handle_help_query,
+            Intent.DIFF: self._handle_diff_query,
+            Intent.UNDO: self._handle_undo,
+            Intent.ARCHITECTURE: self._handle_architecture_query,
+            Intent.RESUME: self._handle_resume,
+            Intent.CONTEXT: self._handle_context_query,
+            Intent.ROUTES: self._handle_routes_query,
         }
         if intent in inline_dispatch:
             inline_dispatch[intent]()
@@ -164,8 +152,7 @@ class AgentCore:
         all_schemas = tool_registry.get_openai_schemas()
         tool_names = self._intent_router.get_tool_names(intent)
         tool_schemas = (
-            all_schemas if tool_names is None
-            else [s for s in all_schemas if s["function"]["name"] in tool_names]
+            all_schemas if tool_names is None else [s for s in all_schemas if s["function"]["name"] in tool_names]
         )
 
         tools_desc = "all" if tool_names is None else str(len(tool_schemas))
@@ -197,21 +184,23 @@ class AgentCore:
             if response.assistant_message:
                 messages.append(response.assistant_message)
             else:
-                messages.append({
-                    "role": "assistant",
-                    "content": response.content or "",
-                    "tool_calls": [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {
-                                "name": tc.name,
-                                "arguments": json.dumps(tc.arguments),
-                            },
-                        }
-                        for tc in response.tool_calls
-                    ],
-                })
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": response.content or "",
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.name,
+                                    "arguments": json.dumps(tc.arguments),
+                                },
+                            }
+                            for tc in response.tool_calls
+                        ],
+                    }
+                )
 
             for tc in response.tool_calls:
                 tool_result = tool_registry.dispatch(tc.name, tc.arguments)
@@ -226,16 +215,16 @@ class AgentCore:
                     tool_registry = self._get_tool_registry(ctx)
                     tool_schemas = tool_registry.get_openai_schemas()
 
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "name": tc.name,
-                    "content": tool_result,
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "name": tc.name,
+                        "content": tool_result,
+                    }
+                )
         else:
-            self.logger.warning(
-                "Reached maximum interaction loop iterations without a final response."
-            )
+            self.logger.warning("Reached maximum interaction loop iterations without a final response.")
 
     def _workspace_exists(self) -> bool:
         """Returns True if a valid workspace directory is configured and accessible."""
@@ -285,21 +274,23 @@ class AgentCore:
             if response.assistant_message:
                 messages.append(response.assistant_message)
             else:
-                messages.append({
-                    "role": "assistant",
-                    "content": response.content or "",
-                    "tool_calls": [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {
-                                "name": tc.name,
-                                "arguments": json.dumps(tc.arguments),
-                            },
-                        }
-                        for tc in response.tool_calls
-                    ],
-                })
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": response.content or "",
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.name,
+                                    "arguments": json.dumps(tc.arguments),
+                                },
+                            }
+                            for tc in response.tool_calls
+                        ],
+                    }
+                )
 
             for tc in response.tool_calls:
                 tool_result = tool_registry.dispatch(tc.name, tc.arguments)
@@ -316,16 +307,16 @@ class AgentCore:
                     except Exception as exc:
                         self.logger.warning(f"Post-clone scan warning: {exc}")
 
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "name": tc.name,
-                    "content": tool_result,
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "name": tc.name,
+                        "content": tool_result,
+                    }
+                )
         else:
-            self.logger.warning(
-                "Reached maximum interaction loop iterations without a final response."
-            )
+            self.logger.warning("Reached maximum interaction loop iterations without a final response.")
 
     def _run_no_workspace_conversation_loop(self, user_prompt: str) -> None:
         messages: List[Dict[str, Any]] = [
@@ -372,15 +363,19 @@ class AgentCore:
         self.memory.refresh_git_state()
 
         # Log completion
-        self.logger.log_event("modify_pipeline_completed", {
-            "success": outcome.success,
-            "steps_completed": len(outcome.plan.completed_steps()),
-            "steps_total": len(outcome.plan.steps),
-            "repair_attempts": outcome.repair_attempts
-        })
+        self.logger.log_event(
+            "modify_pipeline_completed",
+            {
+                "success": outcome.success,
+                "steps_completed": len(outcome.plan.completed_steps()),
+                "steps_total": len(outcome.plan.steps),
+                "repair_attempts": outcome.repair_attempts,
+            },
+        )
 
     def _handle_help_query(self) -> None:
         from agent.main import show_help_panel
+
         show_help_panel()
 
     def _handle_plan_query(self) -> None:
@@ -396,9 +391,7 @@ class AgentCore:
     def _handle_architecture_query(self) -> None:
         ctx = self.memory.repo_context
         if not ctx:
-            self.logger.markdown(
-                "Repository not yet analyzed. Run any prompt to trigger analysis."
-            )
+            self.logger.markdown("Repository not yet analyzed. Run any prompt to trigger analysis.")
             return
 
         arch = ctx.architecture_map
@@ -422,8 +415,9 @@ class AgentCore:
         if arch.component_graph:
             lines += ["", "**Component Graph**:"]
             for layer, files in arch.component_graph.items():
-                lines.append(f"  `{layer}` → {', '.join(files[:5])}"
-                             + (f" (+{len(files)-5} more)" if len(files) > 5 else ""))
+                lines.append(
+                    f"  `{layer}` → {', '.join(files[:5])}" + (f" (+{len(files) - 5} more)" if len(files) > 5 else "")
+                )
 
         def _section(title: str, items: list) -> None:
             if items:
@@ -477,9 +471,7 @@ class AgentCore:
             )
             return
 
-        self.logger.progress(
-            f"Resuming plan '{plan.goal}' — {len(pending)} step(s) remaining..."
-        )
+        self.logger.progress(f"Resuming plan '{plan.goal}' — {len(pending)} step(s) remaining...")
 
         ctx = self.ensure_repository_context()
         orchestrator = self._get_orchestrator(ctx)
@@ -497,10 +489,7 @@ class AgentCore:
                 commands=updated_plan.validation_commands,
             )
             v_status = "passed ✓" if verification.passed else "failed ✗"
-            self.logger.markdown(
-                f"{updated_plan.format_for_display()}\n\n"
-                f"**Verification**: {v_status}"
-            )
+            self.logger.markdown(f"{updated_plan.format_for_display()}\n\n**Verification**: {v_status}")
         else:
             self.logger.markdown(updated_plan.format_for_display())
 
@@ -519,9 +508,7 @@ class AgentCore:
     def _handle_context_query(self) -> None:
         ctx = self.memory.repo_context
         if not ctx:
-            self.logger.markdown(
-                "Repository not yet analyzed. Run any prompt to trigger analysis."
-            )
+            self.logger.markdown("Repository not yet analyzed. Run any prompt to trigger analysis.")
             return
         self.logger.markdown(f"```\n{ctx.format_context_summary()}\n```")
 
@@ -535,13 +522,10 @@ class AgentCore:
                 "No routes detected. NERO currently supports Express.js, FastAPI, Flask, Django, and Next.js."
             )
             return
-        route_lines = [
-            f"| {r.method:<7} | {r.path:<40} | {r.handler:<25} | {r.file}:{r.line} |"
-            for r in ctx.routes
-        ]
+        route_lines = [f"| {r.method:<7} | {r.path:<40} | {r.handler:<25} | {r.file}:{r.line} |" for r in ctx.routes]
         header = "| Method  | Path                                     | Handler                   | Location         |"
-        sep    = "|---------|------------------------------------------|---------------------------|------------------|"
-        table  = "\n".join([header, sep] + route_lines)
+        sep = "|---------|------------------------------------------|---------------------------|------------------|"
+        table = "\n".join([header, sep] + route_lines)
         self.logger.markdown(f"### Detected API Routes ({len(ctx.routes)})\n\n{table}")
 
     def _handle_symbols_query(self, user_prompt: str) -> bool:
@@ -601,9 +585,7 @@ class AgentCore:
             )
             self.memory.reset_after_undo()
             self._scanner.invalidate_cache(self.memory.repo_path)
-            self.logger.success(
-                "Reverted all uncommitted modifications back to clean git baseline."
-            )
+            self.logger.success("Reverted all uncommitted modifications back to clean git baseline.")
         except Exception as exc:
             self.logger.error(f"Undo failed: {exc}")
 

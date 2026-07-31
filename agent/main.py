@@ -2,10 +2,11 @@
 NERO Autonomous AI Coding Agent CLI — Interactive REPL & Command Engine.
 """
 
-import sys
-import os
 import json
+import os
+import sys
 from typing import Optional
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -19,10 +20,9 @@ if sys.platform == "win32":
     except AttributeError:
         pass
 
+from .agent_core import AgentCore
 from .config import AgentConfig
 from .context import WorkingMemory
-from .memory import SessionMemory
-from .agent_core import AgentCore
 from .utils.logger import AgentLogger
 
 app = typer.Typer(
@@ -101,12 +101,7 @@ def show_help_panel():
 
 def _is_git_url(s: str) -> bool:
     """Returns True if the string looks like a remote Git URL."""
-    return (
-        s.startswith("http://")
-        or s.startswith("https://")
-        or s.startswith("git@")
-        or s.endswith(".git")
-    )
+    return s.startswith("http://") or s.startswith("https://") or s.startswith("git@") or s.endswith(".git")
 
 
 def start_repl_session(
@@ -118,6 +113,7 @@ def start_repl_session(
     """Starts interactive REPL session with stateful WorkingMemory."""
     # Ensure onboarding runs first
     from .onboarding import run_onboarding_if_needed
+
     run_onboarding_if_needed()
 
     logger = AgentLogger(verbose=True)
@@ -136,6 +132,7 @@ def start_repl_session(
         dest_for_clone = os.path.abspath(initial_dest) if initial_dest else None
         current_config = config or build_config(dest=dest_for_clone or cwd)
         from .repo import RepositoryManager
+
         repo_mgr = RepositoryManager(current_config)
         try:
             logger.progress(f"Cloning repository: {initial_repo} ...")
@@ -158,11 +155,13 @@ def start_repl_session(
     except Exception as e:
         logger.warning(f"Initial workspace analysis failed: {e}")
 
-    console.print(Panel(
-        f"[bold yellow]Working Workspace:[/bold yellow] [bold green]{workspace}[/bold green]\n"
-        f"[dim]Type your prompt, type [bold green]/help[/bold green] for all commands.[/dim]",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel(
+            f"[bold yellow]Working Workspace:[/bold yellow] [bold green]{workspace}[/bold green]\n"
+            f"[dim]Type your prompt, type [bold green]/help[/bold green] for all commands.[/dim]",
+            border_style="cyan",
+        )
+    )
 
     if initial_request:
         console.print(f"\n[bold green]NERO: Executing prompt: '{initial_request}'[/bold green]\n")
@@ -176,7 +175,7 @@ def start_repl_session(
         try:
             repo_name = os.path.basename(os.path.abspath(current_config.repo_path))
             prompt_str = f"[bold cyan]nero [{repo_name}]>[/bold cyan]"
-            
+
             user_input = Prompt.ask(prompt_str).strip()
 
             if not user_input:
@@ -257,16 +256,26 @@ def start_repl_session(
                                         ts = event.get("timestamp", "").split("T")[-1][:8]
                                         evt_type = event.get("event", "info")
                                         if evt_type == "tool_executed":
-                                            console.print(f"[dim]{ts}[/dim] [bold yellow]TOOL[/bold yellow] [cyan]{event.get('tool')}[/cyan]({event.get('arguments')}) -> {event.get('summary')}")
+                                            console.print(
+                                                f"[dim]{ts}[/dim] [bold yellow]TOOL[/bold yellow] [cyan]{event.get('tool')}[/cyan]({event.get('arguments')}) -> {event.get('summary')}"
+                                            )
                                         elif evt_type == "progress":
-                                            console.print(f"[dim]{ts}[/dim] [bold bright_blue]PROGRESS[/bold bright_blue] {event.get('step')}")
+                                            console.print(
+                                                f"[dim]{ts}[/dim] [bold bright_blue]PROGRESS[/bold bright_blue] {event.get('step')}"
+                                            )
                                         elif evt_type == "error":
-                                            console.print(f"[dim]{ts}[/dim] [bold red]ERROR[/bold red] {event.get('message')}")
+                                            console.print(
+                                                f"[dim]{ts}[/dim] [bold red]ERROR[/bold red] {event.get('message')}"
+                                            )
                                         elif evt_type == "success":
-                                            console.print(f"[dim]{ts}[/dim] [bold green]SUCCESS[/bold green] {event.get('message')}")
+                                            console.print(
+                                                f"[dim]{ts}[/dim] [bold green]SUCCESS[/bold green] {event.get('message')}"
+                                            )
                                         else:
                                             msg = event.get("message") or event.get("content") or str(event)
-                                            console.print(f"[dim]{ts}[/dim] [bold cyan]{evt_type.upper()}[/bold cyan] {msg}")
+                                            console.print(
+                                                f"[dim]{ts}[/dim] [bold cyan]{evt_type.upper()}[/bold cyan] {msg}"
+                                            )
                             except Exception as exc:
                                 console.print(f"[bold red]Failed to read log file: {exc}[/bold red]")
                     elif arg.lower() == "list":
@@ -298,29 +307,54 @@ def start_repl_session(
 
                 if cmd in ("/model", "/m"):
                     if not arg:
-                        console.print(Panel(
-                            f"[bold yellow]Current Active Models per Role:[/bold yellow]\n\n"
-                            f"  • Planner : [bold cyan]{current_config.planner_models}[/bold cyan]\n"
-                            f"  • Coder   : [bold cyan]{current_config.coder_models}[/bold cyan]\n"
-                            f"  • Verifier: [bold cyan]{current_config.verifier_models}[/bold cyan]\n"
-                            f"  • Reviewer: [bold cyan]{current_config.reviewer_models}[/bold cyan]\n"
-                            f"  • Summary : [bold cyan]{current_config.summary_models}[/bold cyan]",
-                            title="[bold yellow]NERO Active Models[/bold yellow]",
-                            border_style="yellow"
-                        ))
+                        console.print(
+                            Panel(
+                                f"[bold yellow]Current Active Models per Role:[/bold yellow]\n\n"
+                                f"  • Planner : [bold cyan]{current_config.planner_models}[/bold cyan]\n"
+                                f"  • Coder   : [bold cyan]{current_config.coder_models}[/bold cyan]\n"
+                                f"  • Verifier: [bold cyan]{current_config.verifier_models}[/bold cyan]\n"
+                                f"  • Reviewer: [bold cyan]{current_config.reviewer_models}[/bold cyan]\n"
+                                f"  • Summary : [bold cyan]{current_config.summary_models}[/bold cyan]",
+                                title="[bold yellow]NERO Active Models[/bold yellow]",
+                                border_style="yellow",
+                            )
+                        )
                     else:
                         from .onboarding import resolve_model_with_provider
+
                         resolved = resolve_model_with_provider(arg)
-                        
+
                         if resolved.startswith("google/"):
-                            all_gemini = ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "google/gemini-3-flash-preview", "google/gemini-3.5-flash-lite"]
+                            all_gemini = [
+                                "google/gemini-3.5-flash",
+                                "google/gemini-3.6-flash",
+                                "google/gemini-3.1-flash-lite",
+                                "google/gemini-3-flash-preview",
+                                "google/gemini-3.5-flash-lite",
+                            ]
                             if resolved in all_gemini:
                                 all_gemini.remove(resolved)
                             gemini_chain = [resolved] + all_gemini
                             planners = gemini_chain + ["openai/gpt-4o-mini", "openrouter/free"]
-                            coders = [resolved, "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest"]
-                            verifiers = [resolved, "google/gemini-3.5-flash-lite", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini"]
-                            reviewers = [resolved, "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o-mini"]
+                            coders = [
+                                resolved,
+                                "google/gemini-3.6-flash",
+                                "google/gemini-3-flash-preview",
+                                "openai/gpt-4o",
+                                "anthropic/claude-3-5-sonnet-latest",
+                            ]
+                            verifiers = [
+                                resolved,
+                                "google/gemini-3.5-flash-lite",
+                                "google/gemini-3.1-flash-lite",
+                                "openai/gpt-4o-mini",
+                            ]
+                            reviewers = [
+                                resolved,
+                                "google/gemini-3.6-flash",
+                                "google/gemini-3-flash-preview",
+                                "openai/gpt-4o-mini",
+                            ]
                             summaries = [resolved, "google/gemini-3.5-flash-lite", "openai/gpt-4o-mini"]
                         elif resolved.startswith("openai/"):
                             planners = [resolved, "openai/gpt-4o-mini"]
@@ -346,46 +380,54 @@ def start_repl_session(
                         current_config.verifier_models = verifiers
                         current_config.reviewer_models = reviewers
                         current_config.summary_models = summaries
-                        
+
                         from . import config as cfg
+
                         settings = cfg.load_global_settings()
-                        settings.update({
-                            "planner_models": planners,
-                            "coder_models": coders,
-                            "verifier_models": verifiers,
-                            "reviewer_models": reviewers,
-                            "summary_models": summaries,
-                        })
+                        settings.update(
+                            {
+                                "planner_models": planners,
+                                "coder_models": coders,
+                                "verifier_models": verifiers,
+                                "reviewer_models": reviewers,
+                                "summary_models": summaries,
+                            }
+                        )
                         cfg.ensure_nero_dirs()
                         with open(cfg.SETTINGS_PATH, "w", encoding="utf-8") as f:
                             json.dump(settings, f, indent=2)
-                        
+
                         agent = AgentCore(current_config, memory, logger)
-                        
-                        console.print(Panel(
-                            f"[bold green]✓ Active model successfully updated to [cyan]{resolved}[/cyan]![/bold green]\n\n"
-                            f"  • Planner : [bold cyan]{current_config.planner_models}[/bold cyan]\n"
-                            f"  • Coder   : [bold cyan]{current_config.coder_models}[/bold cyan]\n"
-                            f"  • Verifier: [bold cyan]{current_config.verifier_models}[/bold cyan]\n"
-                            f"  • Reviewer: [bold cyan]{current_config.reviewer_models}[/bold cyan]\n"
-                            f"  • Summary : [bold cyan]{current_config.summary_models}[/bold cyan]",
-                            title="[bold green]Model Switched[/bold green]",
-                            border_style="green"
-                        ))
+
+                        console.print(
+                            Panel(
+                                f"[bold green]✓ Active model successfully updated to [cyan]{resolved}[/cyan]![/bold green]\n\n"
+                                f"  • Planner : [bold cyan]{current_config.planner_models}[/bold cyan]\n"
+                                f"  • Coder   : [bold cyan]{current_config.coder_models}[/bold cyan]\n"
+                                f"  • Verifier: [bold cyan]{current_config.verifier_models}[/bold cyan]\n"
+                                f"  • Reviewer: [bold cyan]{current_config.reviewer_models}[/bold cyan]\n"
+                                f"  • Summary : [bold cyan]{current_config.summary_models}[/bold cyan]",
+                                title="[bold green]Model Switched[/bold green]",
+                                border_style="green",
+                            )
+                        )
                     continue
 
                 if cmd == "/repo":
                     if not arg:
-                        console.print(Panel(
-                            f"[bold yellow]Current Workspace:[/bold yellow] [bold green]{os.path.abspath(current_config.repo_path)}[/bold green]\n\n"
-                            "[dim]To switch: [bold]/repo ./my-project[/bold] or [bold]/repo https://github.com/owner/repo[/bold][/dim]",
-                            title="[bold cyan]Active Workspace[/bold cyan]",
-                            border_style="cyan"
-                        ))
+                        console.print(
+                            Panel(
+                                f"[bold yellow]Current Workspace:[/bold yellow] [bold green]{os.path.abspath(current_config.repo_path)}[/bold green]\n\n"
+                                "[dim]To switch: [bold]/repo ./my-project[/bold] or [bold]/repo https://github.com/owner/repo[/bold][/dim]",
+                                title="[bold cyan]Active Workspace[/bold cyan]",
+                                border_style="cyan",
+                            )
+                        )
                         continue
                     if _is_git_url(arg):
                         # Clone the remote URL and bind the workspace to the cloned path.
                         from .repo import RepositoryManager
+
                         repo_mgr = RepositoryManager(current_config)
                         try:
                             console.print(f"[dim]Cloning {arg} ...[/dim]")
@@ -403,11 +445,13 @@ def start_repl_session(
                     memory.repo_path = resolved
                     memory.repo_context = None
                     agent = AgentCore(current_config, memory, logger)
-                    console.print(Panel(
-                        f"[bold green]✓ Workspace switched to:[/bold green] [bold cyan]{resolved}[/bold cyan]",
-                        title="[bold green]Workspace Updated[/bold green]",
-                        border_style="green"
-                    ))
+                    console.print(
+                        Panel(
+                            f"[bold green]✓ Workspace switched to:[/bold green] [bold cyan]{resolved}[/bold cyan]",
+                            title="[bold green]Workspace Updated[/bold green]",
+                            border_style="green",
+                        )
+                    )
                     continue
 
                 console.print(f"[bold red]Unknown slash command '{cmd}'. Type /help for available commands.[/bold red]")
@@ -420,13 +464,26 @@ def start_repl_session(
             try:
                 agent.process_prompt(user_input)
             except KeyboardInterrupt:
-                console.print("\n[bold yellow]Task execution cancelled by user. Returning to REPL prompt.[/bold yellow]\n")
+                console.print(
+                    "\n[bold yellow]Task execution cancelled by user. Returning to REPL prompt.[/bold yellow]\n"
+                )
             except Exception as exc:
                 console.print(f"\n[bold red]Error: {exc}[/bold red]\n")
 
         except (KeyboardInterrupt, EOFError):
             console.print("\n[dim]Goodbye from NERO![/dim]")
             break
+
+
+def version_callback(value: bool):
+    if value:
+        import importlib.metadata
+        try:
+            version = importlib.metadata.version("nero-agent")
+        except importlib.metadata.PackageNotFoundError:
+            version = "1.0.0"
+        typer.echo(f"NERO version: {version}")
+        raise typer.Exit()
 
 
 @app.callback(invoke_without_command=True)
@@ -437,7 +494,16 @@ def main_menu(
         help="Git repo URL or local directory path. Omit to use current directory.",
     ),
     request: Optional[str] = typer.Option(None, "--request", "-r", help="Optional initial change request."),
-    dest: Optional[str] = typer.Option(None, "--dest", "-d", help="Workspace directory for cloning. Defaults to current directory."),
+    dest: Optional[str] = typer.Option(
+        None, "--dest", "-d", help="Workspace directory for cloning. Defaults to current directory."
+    ),
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit.",
+    ),
 ):
     """Default entrypoint launching NERO REPL shell.
 
@@ -450,6 +516,7 @@ def main_menu(
         return
 
     from .onboarding import run_onboarding_if_needed
+
     run_onboarding_if_needed()
 
     # When a positional repo argument is provided and is not a URL,
@@ -474,6 +541,7 @@ def main_menu(
 def auto():
     """Execute default autonomous benchmark task immediately."""
     from .onboarding import run_onboarding_if_needed
+
     run_onboarding_if_needed()
 
     config = build_config()
@@ -553,6 +621,7 @@ def run(
 ):
     """Run NERO agent directly with explicit command line parameters."""
     from .onboarding import run_onboarding_if_needed
+
     run_onboarding_if_needed()
 
     config = build_config(

@@ -10,10 +10,10 @@ import hashlib
 import json
 import os
 import subprocess
-import sys
 from datetime import datetime, timedelta
 from typing import Optional
 
+from ..config import CACHE_DIR
 from .context import (
     ArchitectureMap,
     RepositoryContext,
@@ -21,7 +21,6 @@ from .context import (
     SymbolInfo,
     SymbolKind,
 )
-from ..config import CACHE_DIR, AgentConfig
 
 
 class ContextCache:
@@ -125,16 +124,18 @@ class ContextCache:
         symbols = []
         for s in data.get("symbols", []):
             try:
-                symbols.append(SymbolInfo(
-                    name=s["name"],
-                    kind=SymbolKind(s["kind"]),
-                    file=s["file"],
-                    line=s["line"],
-                    signature=s.get("signature", ""),
-                    docstring=s.get("docstring", ""),
-                    is_exported=s.get("is_exported", False),
-                    references=s.get("references", []),
-                ))
+                symbols.append(
+                    SymbolInfo(
+                        name=s["name"],
+                        kind=SymbolKind(s["kind"]),
+                        file=s["file"],
+                        line=s["line"],
+                        signature=s.get("signature", ""),
+                        docstring=s.get("docstring", ""),
+                        is_exported=s.get("is_exported", False),
+                        references=s.get("references", []),
+                    )
+                )
             except (KeyError, ValueError):
                 continue
 

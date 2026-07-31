@@ -5,6 +5,7 @@ RepairController — Phase 4, Step 4 of the MODIFY pipeline.
 from __future__ import annotations
 
 from typing import List
+
 from ..utils.logger import AgentLogger
 from .executor import ToolLoopExecutor
 from .models import IncrementalPlan, VerificationResult
@@ -43,8 +44,7 @@ class RepairController:
         try:
             for attempt in range(1, self._max_attempts + 1):
                 self._logger.progress(
-                    f"Repair attempt {attempt}/{self._max_attempts} "
-                    f"(command: {current_result.command})"
+                    f"Repair attempt {attempt}/{self._max_attempts} (command: {current_result.command})"
                 )
 
                 error_context = self._format_error_context(current_result, attempt)
@@ -66,22 +66,16 @@ class RepairController:
                 )
 
                 if current_result.passed:
-                    self._logger.progress(
-                        f"Repair succeeded on attempt {attempt}. Tests now passing."
-                    )
+                    self._logger.progress(f"Repair succeeded on attempt {attempt}. Tests now passing.")
                     history.append(f"Attempt {attempt} Result: SUCCESS. Tests passed.")
                     return current_result, attempts, history
 
                 self._logger.warning(
-                    f"Repair attempt {attempt} did not fix the failures. "
-                    f"Exit code: {current_result.exit_code}"
+                    f"Repair attempt {attempt} did not fix the failures. Exit code: {current_result.exit_code}"
                 )
                 history.append(f"Attempt {attempt} Result: FAILED. Exit code {current_result.exit_code}.")
 
-            self._logger.error(
-                f"All {self._max_attempts} repair attempts failed. "
-                "Returning last verification result."
-            )
+            self._logger.error(f"All {self._max_attempts} repair attempts failed. Returning last verification result.")
             return current_result, attempts, history
         finally:
             if self._executor and self._executor._tools and self._executor._tools.memory:

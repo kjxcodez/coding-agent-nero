@@ -4,8 +4,9 @@ Model Router managing role-based model dispatching and ordered fallback chains a
 
 import logging
 from typing import Any, Dict, List, Optional
-from .base import LLMProvider, LLMResponse
+
 from ..config import AgentConfig
+from .base import LLMProvider, LLMResponse
 
 _log = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class ModelRouter:
         else:
             # Fallback to whatever provider has a configured API key
             from .. import config as cfg
+
             if cfg.GEMINI_API_KEY:
                 provider_key = "google"
             elif cfg.OPENAI_API_KEY:
@@ -40,7 +42,8 @@ class ModelRouter:
                 provider_key = "openrouter"
 
         if provider_key not in self._providers:
-            from .providers import OpenAIProvider, OpenRouterProvider, GeminiProvider, AnthropicProvider
+            from .providers import AnthropicProvider, GeminiProvider, OpenAIProvider, OpenRouterProvider
+
             if provider_key == "openrouter":
                 self._providers[provider_key] = OpenRouterProvider()
             elif provider_key == "openai":
@@ -74,7 +77,7 @@ class ModelRouter:
     ) -> LLMResponse:
         """
         Attempts execution using the fallback model chain for the given role.
-        
+
         Args:
             role: The agent role ('planner', 'coder', 'verifier', 'reviewer', 'summary').
             messages: Conversation messages list.
@@ -101,9 +104,7 @@ class ModelRouter:
                 )
                 return response
             except Exception as exc:
-                _log.warning(
-                    "Model '%s' failed for role '%s': %s", model, role, exc
-                )
+                _log.warning("Model '%s' failed for role '%s': %s", model, role, exc)
                 last_error = exc
                 continue
 
@@ -123,12 +124,8 @@ class ModelRouter:
                     )
                     return response
                 except Exception as exc:
-                    _log.warning(
-                        "Model '%s' failed on fallback without tools: %s", model, exc
-                    )
+                    _log.warning("Model '%s' failed on fallback without tools: %s", model, exc)
                     last_error = exc
                     continue
 
-        raise RuntimeError(
-            f"All models failed for role '{role}': {models}. Last error: {last_error}"
-        )
+        raise RuntimeError(f"All models failed for role '{role}': {models}. Last error: {last_error}")

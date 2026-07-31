@@ -7,7 +7,6 @@ returns a RepositoryContext that is cached for the current git HEAD.
 from __future__ import annotations
 
 import os
-import re
 import subprocess
 from datetime import datetime
 from typing import Dict, List, Optional, Set, Tuple
@@ -27,58 +26,137 @@ class RepositoryScanner:
     This class is the ONLY entry point for repository analysis.
     """
 
-    SIZE_FULL        = 500
+    SIZE_FULL = 500
     SIZE_PROGRESSIVE = 5_000
 
     IGNORED_DIRS: Set[str] = {
-        ".git", ".svn", ".hg",
-        "node_modules", "__pycache__", ".pytest_cache",
-        ".mypy_cache", ".ruff_cache", ".tox",
-        "dist", "build", "out", ".next", ".nuxt", ".output",
-        "coverage", ".nyc_output", "htmlcov",
-        "venv", ".venv", "env", ".env_dir",
-        "__generated__", "generated", ".turbo",
-        ".cache", ".parcel-cache", "tmp", "temp",
-        ".idea", ".vscode", ".DS_Store",
+        ".git",
+        ".svn",
+        ".hg",
+        "node_modules",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".tox",
+        "dist",
+        "build",
+        "out",
+        ".next",
+        ".nuxt",
+        ".output",
+        "coverage",
+        ".nyc_output",
+        "htmlcov",
+        "venv",
+        ".venv",
+        "env",
+        ".env_dir",
+        "__generated__",
+        "generated",
+        ".turbo",
+        ".cache",
+        ".parcel-cache",
+        "tmp",
+        "temp",
+        ".idea",
+        ".vscode",
+        ".DS_Store",
         "vendor",
     }
 
     IGNORED_EXTENSIONS: Set[str] = {
-        ".pyc", ".pyo", ".pyd",
-        "/.so", "/.dylib", ".dll", ".exe", ".o", ".obj",
-        ".jpg", ".jpeg", ".png", ".gif", ".ico", ".svg", ".webp", ".avif",
-        ".pdf", ".doc", ".docx", ".xls", ".xlsx",
-        ".zip", ".tar", ".gz", ".bz2", ".rar", ".7z",
-        ".mp4", ".mp3", ".avi", ".mov", ".wav",
-        ".ttf", ".woff", ".woff2", ".eot",
+        ".pyc",
+        ".pyo",
+        ".pyd",
+        "/.so",
+        "/.dylib",
+        ".dll",
+        ".exe",
+        ".o",
+        ".obj",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".ico",
+        ".svg",
+        ".webp",
+        ".avif",
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".bz2",
+        ".rar",
+        ".7z",
+        ".mp4",
+        ".mp3",
+        ".avi",
+        ".mov",
+        ".wav",
+        ".ttf",
+        ".woff",
+        ".woff2",
+        ".eot",
         ".lock",
     }
 
     CONFIG_FILE_NAMES: Set[str] = {
-        "package.json", "pyproject.toml", "setup.py", "setup.cfg",
-        "Cargo.toml", "go.mod", "go.sum", "pom.xml",
-        "build.gradle", "build.gradle.kts",
-        "tsconfig.json", "jsconfig.json",
-        "webpack.config.js", "vite.config.ts", "vite.config.js",
-        "next.config.js", "next.config.ts", "next.config.mjs",
-        "turbo.json", "lerna.json", "nx.json",
-        "docker-compose.yml", "docker-compose.yaml", "Dockerfile",
-        ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml",
-        ".prettierrc", ".prettierrc.json",
-        "babel.config.js", "jest.config.js", "jest.config.ts",
-        "vitest.config.ts", "vitest.config.js",
-        ".gitignore", ".dockerignore",
-        "Makefile", "makefile",
-        "mypy.ini", ".mypy.ini", "pyrightconfig.json",
+        "package.json",
+        "pyproject.toml",
+        "setup.py",
+        "setup.cfg",
+        "Cargo.toml",
+        "go.mod",
+        "go.sum",
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "tsconfig.json",
+        "jsconfig.json",
+        "webpack.config.js",
+        "vite.config.ts",
+        "vite.config.js",
+        "next.config.js",
+        "next.config.ts",
+        "next.config.mjs",
+        "turbo.json",
+        "lerna.json",
+        "nx.json",
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "Dockerfile",
+        ".eslintrc.js",
+        ".eslintrc.json",
+        ".eslintrc.yml",
+        ".prettierrc",
+        ".prettierrc.json",
+        "babel.config.js",
+        "jest.config.js",
+        "jest.config.ts",
+        "vitest.config.ts",
+        "vitest.config.js",
+        ".gitignore",
+        ".dockerignore",
+        "Makefile",
+        "makefile",
+        "mypy.ini",
+        ".mypy.ini",
+        "pyrightconfig.json",
     }
 
     def __init__(self, config: AgentConfig) -> None:
         self.config = config
-        self._cache         = ContextCache()
+        self._cache = ContextCache()
         self._lang_detector = LanguageDetector(config)
-        self._fw_detector   = FrameworkDetector(config)
+        self._fw_detector = FrameworkDetector(config)
         self._route_extractor = RouteExtractor(config)
-        self._env_scanner   = EnvScanner(config)
+        self._env_scanner = EnvScanner(config)
         self._symbol_builder = SymbolIndexBuilder(config)
 
     def scan(self, repo_path: str) -> RepositoryContext:
@@ -116,19 +194,20 @@ class RepositoryScanner:
         primary_lang, all_langs = self._lang_detector.detect(all_files)
         frameworks, databases, pkg_managers, build_tools = self._fw_detector.detect(all_files, abs_path)
 
-        entrypoints       = self._find_entrypoints(all_files, primary_lang)
-        models_files      = self._find_matching(all_files, ["model", "schema", "entity", "dto"])
-        controllers_files = self._find_matching(all_files, ["controller", "route", "router", "api", "views", "view", "handler"])
-        services_files    = self._find_matching(all_files, ["service", "repo", "repository", "dao", "store", "provider"])
-        test_files        = self._find_matching(all_files, ["test", "spec", "__tests__", "tests"])
-        config_files      = self._find_config_files(all_files)
+        entrypoints = self._find_entrypoints(all_files, primary_lang)
+        models_files = self._find_matching(all_files, ["model", "schema", "entity", "dto"])
+        controllers_files = self._find_matching(
+            all_files, ["controller", "route", "router", "api", "views", "view", "handler"]
+        )
+        services_files = self._find_matching(all_files, ["service", "repo", "repository", "dao", "store", "provider"])
+        test_files = self._find_matching(all_files, ["test", "spec", "__tests__", "tests"])
+        config_files = self._find_config_files(all_files)
 
         routes = self._route_extractor.extract(all_files, abs_path, frameworks)
         env_files, env_vars = self._env_scanner.scan(all_files, abs_path)
 
         arch_map = self._build_architecture_map(
-            primary_lang, frameworks, entrypoints, controllers_files,
-            services_files, models_files, test_files
+            primary_lang, frameworks, entrypoints, controllers_files, services_files, models_files, test_files
         )
 
         symbols = []
@@ -177,8 +256,13 @@ class RepositoryScanner:
                 if ext in self.IGNORED_EXTENSIONS:
                     continue
                 if filename.startswith(".") and filename not in {
-                    ".env", ".env.example", ".env.sample", ".env.template",
-                    ".gitignore", ".dockerignore", ".eslintrc.json",
+                    ".env",
+                    ".env.example",
+                    ".env.sample",
+                    ".env.template",
+                    ".gitignore",
+                    ".dockerignore",
+                    ".eslintrc.json",
                 }:
                     continue
 
@@ -223,11 +307,27 @@ class RepositoryScanner:
 
     def _find_entrypoints(self, files: List[str], primary_lang: str) -> List[str]:
         entrypoint_names = {
-            "index.js", "index.ts", "server.js", "server.ts",
-            "app.js", "app.ts", "main.js", "main.ts",
-            "entry.js", "entry.ts", "main.py", "app.py", "run.py", "server.py",
-            "manage.py", "asgi.py", "wsgi.py", "Application.java", "Main.java",
-            "main.go", "main.rs",
+            "index.js",
+            "index.ts",
+            "server.js",
+            "server.ts",
+            "app.js",
+            "app.ts",
+            "main.js",
+            "main.ts",
+            "entry.js",
+            "entry.ts",
+            "main.py",
+            "app.py",
+            "run.py",
+            "server.py",
+            "manage.py",
+            "asgi.py",
+            "wsgi.py",
+            "Application.java",
+            "Main.java",
+            "main.go",
+            "main.rs",
         }
         results = []
         for f in files:
@@ -250,10 +350,10 @@ class RepositoryScanner:
         tests: List[str],
     ) -> ArchitectureMap:
         has_controllers = bool(controllers)
-        has_services    = bool(services)
-        has_models      = bool(models)
-        has_tests       = bool(tests)
-        fw_set          = set(frameworks)
+        has_services = bool(services)
+        has_models = bool(models)
+        has_tests = bool(tests)
+        fw_set = set(frameworks)
 
         is_monorepo = any("packages/" in e or "apps/" in e for e in entrypoints)
 
@@ -320,6 +420,7 @@ class RepositoryScanner:
                 curr = curr[part]
 
         lines = []
+
         def _render(node, indent="  ", depth=0):
             if len(lines) >= max_lines:
                 return
@@ -333,6 +434,6 @@ class RepositoryScanner:
                     lines.append(f"{indent}{name}/")
                     if depth < 2:  # Traverse up to 2 levels deep
                         _render(sub, indent + "    ", depth + 1)
-                        
+
         _render(tree, "  ", 0)
         return "\n".join(lines)

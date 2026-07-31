@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import List, Optional, Tuple
+from typing import List
 
 from ..config import AgentConfig
 from .context import RouteDefinition
@@ -121,13 +121,15 @@ class RouteExtractor:
                 method = m.group(1).upper()
                 path = m.group(2)
                 handler = self._extract_handler_name(content, i)
-                routes.append(RouteDefinition(
-                    method=method,
-                    path=path,
-                    handler=handler or "(anonymous)",
-                    file=rel_path,
-                    line=i,
-                ))
+                routes.append(
+                    RouteDefinition(
+                        method=method,
+                        path=path,
+                        handler=handler or "(anonymous)",
+                        file=rel_path,
+                        line=i,
+                    )
+                )
         return routes
 
     def _extract_fastapi(self, rel_path: str, content: str) -> List[RouteDefinition]:
@@ -144,13 +146,15 @@ class RouteExtractor:
                     func_m = re.match(r"(?:async\s+)?def\s+(\w+)", next_line)
                     if func_m:
                         handler = func_m.group(1)
-                routes.append(RouteDefinition(
-                    method=method,
-                    path=path,
-                    handler=handler or "(anonymous)",
-                    file=rel_path,
-                    line=i,
-                ))
+                routes.append(
+                    RouteDefinition(
+                        method=method,
+                        path=path,
+                        handler=handler or "(anonymous)",
+                        file=rel_path,
+                        line=i,
+                    )
+                )
         return routes
 
     def _extract_flask(self, rel_path: str, content: str) -> List[RouteDefinition]:
@@ -162,24 +166,22 @@ class RouteExtractor:
             if m:
                 path = m.group(2)
                 methods_str = m.group(3)
-                methods = (
-                    [meth.strip().strip("'\"") for meth in methods_str.split(",")]
-                    if methods_str
-                    else ["GET"]
-                )
+                methods = [meth.strip().strip("'\"") for meth in methods_str.split(",")] if methods_str else ["GET"]
                 handler = ""
                 if i < len(lines):
                     func_m = re.match(r"(?:async\s+)?def\s+(\w+)", lines[i].strip())
                     if func_m:
                         handler = func_m.group(1)
                 for method in methods:
-                    routes.append(RouteDefinition(
-                        method=method.upper(),
-                        path=path,
-                        handler=handler or "(anonymous)",
-                        file=rel_path,
-                        line=i,
-                    ))
+                    routes.append(
+                        RouteDefinition(
+                            method=method.upper(),
+                            path=path,
+                            handler=handler or "(anonymous)",
+                            file=rel_path,
+                            line=i,
+                        )
+                    )
                 continue
 
             m2 = _FLASK_METHOD_PATTERN.search(line)
@@ -191,13 +193,15 @@ class RouteExtractor:
                     func_m = re.match(r"(?:async\s+)?def\s+(\w+)", lines[i].strip())
                     if func_m:
                         handler = func_m.group(1)
-                routes.append(RouteDefinition(
-                    method=method,
-                    path=path,
-                    handler=handler or "(anonymous)",
-                    file=rel_path,
-                    line=i,
-                ))
+                routes.append(
+                    RouteDefinition(
+                        method=method,
+                        path=path,
+                        handler=handler or "(anonymous)",
+                        file=rel_path,
+                        line=i,
+                    )
+                )
         return routes
 
     def _extract_django(self, rel_path: str, content: str) -> List[RouteDefinition]:
@@ -207,13 +211,15 @@ class RouteExtractor:
             if m:
                 path = m.group(1)
                 handler = m.group(2)
-                routes.append(RouteDefinition(
-                    method="*",
-                    path=path,
-                    handler=handler,
-                    file=rel_path,
-                    line=i,
-                ))
+                routes.append(
+                    RouteDefinition(
+                        method="*",
+                        path=path,
+                        handler=handler,
+                        file=rel_path,
+                        line=i,
+                    )
+                )
         return routes
 
     def _extract_nextjs_routes(self, files: List[str]) -> List[RouteDefinition]:
@@ -224,24 +230,28 @@ class RouteExtractor:
                 api_path = re.sub(r"^.*?app/", "/", norm)
                 api_path = re.sub(r"/route\.(ts|js)$", "", api_path)
                 api_path = re.sub(r"\[([^\]]+)\]", r":\1", api_path)
-                routes.append(RouteDefinition(
-                    method="ALL",
-                    path=api_path,
-                    handler="route handler",
-                    file=rel_path,
-                    line=1,
-                ))
+                routes.append(
+                    RouteDefinition(
+                        method="ALL",
+                        path=api_path,
+                        handler="route handler",
+                        file=rel_path,
+                        line=1,
+                    )
+                )
             elif "pages/api/" in norm and norm.endswith((".ts", ".js")):
                 api_path = re.sub(r"^.*?pages", "", norm)
                 api_path = re.sub(r"\.(ts|js)$", "", api_path)
                 api_path = re.sub(r"\[([^\]]+)\]", r":\1", api_path)
-                routes.append(RouteDefinition(
-                    method="ALL",
-                    path=api_path,
-                    handler="API handler",
-                    file=rel_path,
-                    line=1,
-                ))
+                routes.append(
+                    RouteDefinition(
+                        method="ALL",
+                        path=api_path,
+                        handler="API handler",
+                        file=rel_path,
+                        line=1,
+                    )
+                )
         return routes
 
     def _read_file(self, abs_path: str) -> str:

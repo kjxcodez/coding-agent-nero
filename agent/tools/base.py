@@ -5,10 +5,11 @@ Abstract Tool interface and schema generators.
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
+
 class ToolError(Exception):
     """Exception raised during tool execution failure."""
-    pass
 
+    pass
 
 
 class BaseTool(ABC):

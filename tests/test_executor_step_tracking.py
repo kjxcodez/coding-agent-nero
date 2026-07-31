@@ -12,16 +12,16 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, patch
+from typing import List, Optional
+from unittest.mock import MagicMock
 
-from agent.pipeline.executor import ToolLoopExecutor, _STEP_SIGNAL_RE
+from agent.pipeline.executor import _STEP_SIGNAL_RE, ToolLoopExecutor
 from agent.pipeline.models import IncrementalPlan, PlanStep, StepStatus
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_plan(n_steps: int) -> IncrementalPlan:
     """Build a fresh n-step plan with all steps PENDING."""
@@ -30,10 +30,7 @@ def _make_plan(n_steps: int) -> IncrementalPlan:
         understanding="",
         approach="",
         affected_files=[],
-        steps=[
-            PlanStep(id=i, description=f"Step {i}")
-            for i in range(1, n_steps + 1)
-        ],
+        steps=[PlanStep(id=i, description=f"Step {i}") for i in range(1, n_steps + 1)],
         validation_commands=[],
         risks=[],
         created_at=datetime.now().isoformat(),
@@ -67,6 +64,7 @@ def _stub_response(content: str = "", tool_calls: Optional[List] = None):
 # Tests for _apply_step_signals (unit)
 # ---------------------------------------------------------------------------
 
+
 class TestApplyStepSignals(unittest.TestCase):
     """Tests for the _apply_step_signals helper in isolation."""
 
@@ -88,9 +86,7 @@ class TestApplyStepSignals(unittest.TestCase):
         plan = _make_plan(3)
         plan.steps[1].mark_in_progress()
 
-        idx = self.executor._apply_step_signals(
-            "STEP 2 BLOCKED: file not found", plan, 1
-        )
+        idx = self.executor._apply_step_signals("STEP 2 BLOCKED: file not found", plan, 1)
 
         self.assertEqual(plan.steps[1].status, StepStatus.FAILED)
         self.assertEqual(idx, 2)
@@ -157,6 +153,7 @@ class TestApplyStepSignals(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Tests for execute() integration (with mocked LLM)
 # ---------------------------------------------------------------------------
+
 
 class TestExecuteStepTracking(unittest.TestCase):
     """Integration tests for execute(), verifying step pointer behavior."""
@@ -293,8 +290,7 @@ class TestExecuteStepTracking(unittest.TestCase):
         plan = self._run_with_responses(plan, responses)
 
         for s in plan.steps:
-            self.assertEqual(s.status, StepStatus.COMPLETED,
-                             f"Step {s.id} should be COMPLETED but was {s.status}")
+            self.assertEqual(s.status, StepStatus.COMPLETED, f"Step {s.id} should be COMPLETED but was {s.status}")
 
     # Verify per-write advancement is GONE
     def test_write_call_does_not_advance_step(self):
@@ -328,15 +324,18 @@ class TestExecuteStepTracking(unittest.TestCase):
 
         # Only step 1 should be COMPLETED; steps 2 and 3 should NOT be
         self.assertEqual(plan.steps[0].status, StepStatus.COMPLETED)
-        self.assertNotEqual(plan.steps[1].status, StepStatus.COMPLETED,
-                            "Step 2 must NOT be COMPLETED just because 2 files were written")
-        self.assertNotEqual(plan.steps[2].status, StepStatus.COMPLETED,
-                            "Step 3 must NOT be COMPLETED just because 3 files were written")
+        self.assertNotEqual(
+            plan.steps[1].status, StepStatus.COMPLETED, "Step 2 must NOT be COMPLETED just because 2 files were written"
+        )
+        self.assertNotEqual(
+            plan.steps[2].status, StepStatus.COMPLETED, "Step 3 must NOT be COMPLETED just because 3 files were written"
+        )
 
 
 # ---------------------------------------------------------------------------
 # Verify current_step_idx initialization
 # ---------------------------------------------------------------------------
+
 
 class TestCurrentStepIdxInit(unittest.TestCase):
     """Verify the initial step index computation."""

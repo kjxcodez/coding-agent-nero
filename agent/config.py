@@ -5,10 +5,11 @@ Manages environmental variables, global configurations from ~/.nero/,
 model routing defaults, safety parameters, and role-based fallback chains.
 """
 
-import os
 import json
+import os
 from dataclasses import dataclass, field
-from typing import List, Tuple, Dict, Any
+from typing import Any, Dict, List, Tuple
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,20 +22,35 @@ LOGS_DIR = os.path.join(NERO_DIR, "logs")
 SESSIONS_DIR = os.path.join(NERO_DIR, "sessions")
 CACHE_DIR = os.path.join(NERO_DIR, "cache")
 
+
 def ensure_nero_dirs():
     """Ensure that all NERO global subdirectories exist."""
     for d in [NERO_DIR, LOGS_DIR, SESSIONS_DIR, CACHE_DIR]:
         os.makedirs(d, exist_ok=True)
 
+
 class ConfigValidationError(ValueError):
     """Raised when configuration fields fail validation checks."""
+
     pass
 
 
 # Default configuration settings
 DEFAULT_SETTINGS = {
-    "planner_models": ["google/gemini-2.5-flash", "google/gemini-2.5-pro", "openai/gpt-4o-mini", "anthropic/claude-3-5-haiku-latest", "openrouter/free"],
-    "coder_models": ["google/gemini-2.5-flash", "google/gemini-2.5-pro", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest", "openrouter/free"],
+    "planner_models": [
+        "google/gemini-2.5-flash",
+        "google/gemini-2.5-pro",
+        "openai/gpt-4o-mini",
+        "anthropic/claude-3-5-haiku-latest",
+        "openrouter/free",
+    ],
+    "coder_models": [
+        "google/gemini-2.5-flash",
+        "google/gemini-2.5-pro",
+        "openai/gpt-4o",
+        "anthropic/claude-3-5-sonnet-latest",
+        "openrouter/free",
+    ],
     "verifier_models": ["google/gemini-2.5-flash", "openai/gpt-4o-mini", "openrouter/free"],
     "reviewer_models": ["google/gemini-2.5-flash", "openai/gpt-4o-mini", "openrouter/free"],
     "summary_models": ["google/gemini-2.5-flash", "openai/gpt-4o-mini", "openrouter/free"],
@@ -44,6 +60,7 @@ DEFAULT_SETTINGS = {
     "temperature": 0.1,
     "verbose": True,
 }
+
 
 def load_global_settings() -> Dict[str, Any]:
     """Loads configuration settings from ~/.nero/settings.json."""
@@ -59,6 +76,7 @@ def load_global_settings() -> Dict[str, Any]:
     except Exception:
         return DEFAULT_SETTINGS
 
+
 def load_global_credentials() -> Dict[str, str]:
     """Loads API credentials from ~/.nero/credentials.json."""
     if not os.path.isfile(CREDENTIALS_PATH):
@@ -68,6 +86,7 @@ def load_global_credentials() -> Dict[str, str]:
             return json.load(f)
     except Exception:
         return {}
+
 
 # Load global configuration
 ensure_nero_dirs()
@@ -84,10 +103,11 @@ OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/ap
 OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "https://github.com/")
 OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "autonomous-coding-agent")
 
+
 @dataclass
 class AgentConfig:
     """Central configuration dataclass governing agent execution behavior."""
-    
+
     # Model Fallback Chains per Role
     planner_models: List[str] = field(default_factory=lambda: list(_settings.get("planner_models", [])))
     coder_models: List[str] = field(default_factory=lambda: list(_settings.get("coder_models", [])))
@@ -103,8 +123,8 @@ class AgentConfig:
     verbose: bool = bool(_settings.get("verbose", True))
 
     # Verification overrides (set from CLI; None means use plan commands / auto-detect)
-    verifier_command: str = ""        # If non-empty, used as the sole verification command
-    skip_verification: bool = False   # If True, verification is skipped entirely
+    verifier_command: str = ""  # If non-empty, used as the sole verification command
+    skip_verification: bool = False  # If True, verification is skipped entirely
 
     # Security & Sandboxing Constraints
     ignored_dirs: Tuple[str, ...] = (
@@ -176,9 +196,13 @@ class AgentConfig:
             raise ConfigValidationError("planner_models must be a list of non-empty strings.")
         if not isinstance(self.coder_models, list) or not all(isinstance(m, str) and m for m in self.coder_models):
             raise ConfigValidationError("coder_models must be a list of non-empty strings.")
-        if not isinstance(self.verifier_models, list) or not all(isinstance(m, str) and m for m in self.verifier_models):
+        if not isinstance(self.verifier_models, list) or not all(
+            isinstance(m, str) and m for m in self.verifier_models
+        ):
             raise ConfigValidationError("verifier_models must be a list of non-empty strings.")
-        if not isinstance(self.reviewer_models, list) or not all(isinstance(m, str) and m for m in self.reviewer_models):
+        if not isinstance(self.reviewer_models, list) or not all(
+            isinstance(m, str) and m for m in self.reviewer_models
+        ):
             raise ConfigValidationError("reviewer_models must be a list of non-empty strings.")
         if not isinstance(self.summary_models, list) or not all(isinstance(m, str) and m for m in self.summary_models):
             raise ConfigValidationError("summary_models must be a list of non-empty strings.")
@@ -189,10 +213,14 @@ class AgentConfig:
         if not isinstance(self.max_iterations, int) or self.max_iterations <= 0:
             raise ConfigValidationError(f"max_iterations must be a positive integer (got {self.max_iterations}).")
         if self.max_iterations > 100:
-            raise ConfigValidationError(f"max_iterations is capped at 100 to prevent infinite loops (got {self.max_iterations}).")
+            raise ConfigValidationError(
+                f"max_iterations is capped at 100 to prevent infinite loops (got {self.max_iterations})."
+            )
 
         if not isinstance(self.max_repair_attempts, int) or self.max_repair_attempts < 0:
-            raise ConfigValidationError(f"max_repair_attempts must be a non-negative integer (got {self.max_repair_attempts}).")
+            raise ConfigValidationError(
+                f"max_repair_attempts must be a non-negative integer (got {self.max_repair_attempts})."
+            )
         if self.max_repair_attempts > 20:
             raise ConfigValidationError(f"max_repair_attempts is capped at 20 (got {self.max_repair_attempts}).")
 

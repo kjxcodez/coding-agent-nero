@@ -1,6 +1,6 @@
-from .session import SessionMemory, GitState, ConversationTurn
+from .edit_log import EditEntry, EditLog
+from .session import ConversationTurn, GitState, SessionMemory
 from .snapshot import FileSnapshot
-from .edit_log import EditLog, EditEntry
 
 __all__ = [
     "SessionMemory",

@@ -4,12 +4,12 @@ VerificationEngine — Phase 4, Step 3 of the MODIFY pipeline.
 
 from __future__ import annotations
 
-import os
-import subprocess
-import shlex
-import sys
-import shutil
 import json
+import os
+import shlex
+import shutil
+import subprocess
+import sys
 from typing import List, Optional
 
 from ..config import AgentConfig
@@ -75,7 +75,18 @@ class VerificationEngine:
 
         if any(f in files for f in ("package.json", "yarn.lock", "pnpm-lock.yaml", "package-lock.json", "bun.lockb")):
             return "node"
-        if any(f in files for f in ("requirements.txt", "pyproject.toml", "poetry.lock", "Pipfile", "setup.py", "setup.cfg", "pytest.ini")):
+        if any(
+            f in files
+            for f in (
+                "requirements.txt",
+                "pyproject.toml",
+                "poetry.lock",
+                "Pipfile",
+                "setup.py",
+                "setup.cfg",
+                "pytest.ini",
+            )
+        ):
             return "python"
         if "go.mod" in files:
             return "go"
@@ -105,8 +116,7 @@ class VerificationEngine:
                 dev_deps = data.get("devDependencies", {})
                 test_frameworks = ("jest", "mocha", "jasmine", "tape", "vitest", "ava", "cypress", "playwright")
                 has_framework = any(
-                    any(fw in dep for fw in test_frameworks)
-                    for dep in (list(deps.keys()) + list(dev_deps.keys()))
+                    any(fw in dep for fw in test_frameworks) for dep in (list(deps.keys()) + list(dev_deps.keys()))
                 )
                 if not has_framework:
                     return True
@@ -128,8 +138,7 @@ class VerificationEngine:
 
     def _run_fallback_verification(self, repo_path: str, ecosystem: str) -> VerificationResult:
         self._logger.warning(
-            f"Native test command failed or was missing. "
-            f"Running fallback verification for '{ecosystem}' project..."
+            f"Native test command failed or was missing. Running fallback verification for '{ecosystem}' project..."
         )
 
         if ecosystem == "node":
@@ -196,11 +205,7 @@ class VerificationEngine:
                 if not res.passed:
                     return res
         return VerificationResult(
-            passed=True,
-            command="node syntax check",
-            exit_code=0,
-            stdout="All Node syntax checks passed.",
-            stderr=""
+            passed=True, command="node syntax check", exit_code=0, stdout="All Node syntax checks passed.", stderr=""
         )
 
     def _run_node_boot_check(self, repo_path: str) -> VerificationResult:
@@ -213,7 +218,7 @@ class VerificationEngine:
                 entrypoint = data.get("main")
             except Exception:
                 pass
-        
+
         if not entrypoint or not os.path.isfile(os.path.join(repo_path, entrypoint)):
             for common in ("server.js", "app.js", "index.js"):
                 if os.path.isfile(os.path.join(repo_path, common)):
@@ -223,6 +228,7 @@ class VerificationEngine:
         if entrypoint and os.path.isfile(os.path.join(repo_path, entrypoint)):
             self._logger.progress(f"Running Node boot check: node {entrypoint} (2.0s)...")
             import time
+
             try:
                 proc = subprocess.Popen(
                     ["node", entrypoint],
@@ -262,7 +268,7 @@ class VerificationEngine:
             command="node boot check",
             exit_code=0,
             stdout="Node boot check completed or skipped.",
-            stderr=""
+            stderr="",
         )
 
     def _run_python_fallback(self, repo_path: str) -> VerificationResult:
@@ -276,7 +282,7 @@ class VerificationEngine:
             command="python compileall",
             exit_code=0,
             stdout="All Python files compiled successfully.",
-            stderr=""
+            stderr="",
         )
 
     def _run_go_fallback(self, repo_path: str) -> VerificationResult:
@@ -307,11 +313,7 @@ class VerificationEngine:
             if not res.passed:
                 return res
         return VerificationResult(
-            passed=True,
-            command="php syntax check",
-            exit_code=0,
-            stdout="PHP syntax check succeeded.",
-            stderr=""
+            passed=True, command="php syntax check", exit_code=0, stdout="PHP syntax check succeeded.", stderr=""
         )
 
     def _run_ruby_fallback(self, repo_path: str) -> VerificationResult:
@@ -322,11 +324,7 @@ class VerificationEngine:
             if not res.passed:
                 return res
         return VerificationResult(
-            passed=True,
-            command="ruby syntax check",
-            exit_code=0,
-            stdout="Ruby syntax check succeeded.",
-            stderr=""
+            passed=True, command="ruby syntax check", exit_code=0, stdout="Ruby syntax check succeeded.", stderr=""
         )
 
     def _run_generic_fallback(self, repo_path: str) -> VerificationResult:
@@ -337,7 +335,7 @@ class VerificationEngine:
             exit_code=0,
             stdout="Generic ecosystem. Skipping tests.",
             stderr="",
-            error_summary="Skipped — generic ecosystem."
+            error_summary="Skipped — generic ecosystem.",
         )
 
     def _get_modified_files(self, repo_path: str, extensions: tuple[str, ...]) -> List[str]:
@@ -370,13 +368,25 @@ class VerificationEngine:
             if "not in allow-list" in result.stderr:
                 return "Verification Unsupported"
             return "Missing Runtime or Dependency"
-            
+
         combined = (result.stderr + "\n" + result.stdout).lower()
         if "syntaxerror" in combined or "syntax error" in combined or "parse error" in combined:
             return "Syntax Error"
-        if "compilation error" in combined or "failed to compile" in combined or "build failed" in combined or "could not compile" in combined:
+        if (
+            "compilation error" in combined
+            or "failed to compile" in combined
+            or "build failed" in combined
+            or "could not compile" in combined
+        ):
             return "Compilation Error"
-        if "missing dependency" in combined or "cannot find module" in combined or "modulerequestfailed" in combined or "modulenotfounderror" in combined or "importerror" in combined or "import error" in combined:
+        if (
+            "missing dependency" in combined
+            or "cannot find module" in combined
+            or "modulerequestfailed" in combined
+            or "modulenotfounderror" in combined
+            or "importerror" in combined
+            or "import error" in combined
+        ):
             return "Missing Dependency"
         if (
             "missing database" in combined
@@ -396,7 +406,7 @@ class VerificationEngine:
             return "Runtime Crash"
         if "failed" in combined or "failing" in combined or "failures" in combined or "assertionerror" in combined:
             return "Test Failure"
-            
+
         return "Verification Failed"
 
     def _populate_result(self, result: VerificationResult) -> VerificationResult:
@@ -430,7 +440,7 @@ class VerificationEngine:
             )
 
         self._logger.progress(f"Verifying: {command}")
-        
+
         try:
             cmd_args = shlex.split(command)
         except ValueError as val_err:
@@ -476,9 +486,7 @@ class VerificationEngine:
             )
             passed = proc.returncode == 0
             failed_tests = self._extract_failed_tests(proc.stdout + proc.stderr)
-            error_summary = self._summarise_failure(
-                proc.stdout, proc.stderr, proc.returncode
-            ) if not passed else ""
+            error_summary = self._summarise_failure(proc.stdout, proc.stderr, proc.returncode) if not passed else ""
 
             return VerificationResult(
                 passed=passed,
@@ -540,39 +548,40 @@ class VerificationEngine:
             if "bun.lockb" in files:
                 return ["bun test"]
             return ["npm test"]
-            
+
         elif ecosystem == "python":
             if any(f in files for f in ("pytest.ini", "setup.cfg")):
                 return ["pytest"]
             return ["python -m pytest"]
-            
+
         elif ecosystem == "go":
             return ["go test"]
-            
+
         elif ecosystem == "rust":
             return ["cargo test"]
-            
+
         elif ecosystem == "java":
             if "pom.xml" in files:
                 return ["mvn test"]
             return ["gradle test"]
-            
+
         elif ecosystem == "dotnet":
             return ["dotnet test"]
-            
+
         elif ecosystem == "php":
             return ["composer test"]
-            
+
         elif ecosystem == "ruby":
             if "Gemfile" in files:
                 return ["bundle exec rspec"]
             return ["ruby -c"]
-            
+
         return []
 
     @staticmethod
     def _extract_failed_tests(output: str) -> List[str]:
         import re
+
         failed: List[str] = []
         for m in re.finditer(r"FAILED\s+([\w/\\:\.]+)", output):
             failed.append(m.group(1))
@@ -585,10 +594,9 @@ class VerificationEngine:
         combined = (stderr + "\n" + stdout).strip()
         lines = combined.splitlines()
         error_lines = [
-            l for l in lines
-            if any(kw in l.lower() for kw in (
-                "error", "fail", "exception", "assert", "traceback", "fatal"
-            ))
+            l
+            for l in lines
+            if any(kw in l.lower() for kw in ("error", "fail", "exception", "assert", "traceback", "fatal"))
         ]
         relevant = error_lines[:15] or lines[-15:]
         return "\n".join(relevant)

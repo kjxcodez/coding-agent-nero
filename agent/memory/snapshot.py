@@ -5,9 +5,8 @@ FileSnapshot — typed, immutable record of a file read or write observation.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 
 @dataclass(frozen=True)

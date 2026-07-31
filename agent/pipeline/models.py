@@ -6,21 +6,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
 
 class StepStatus(str, Enum):
-    PENDING     = "pending"
+    PENDING = "pending"
     IN_PROGRESS = "in_progress"
-    COMPLETED   = "completed"
-    FAILED      = "failed"
-    SKIPPED     = "skipped"
-    BLOCKED     = "blocked"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    BLOCKED = "blocked"
 
 
 @dataclass
 class PlanStep:
     """One atomic unit of work in a modification plan."""
+
     id: int
     description: str
     target_files: List[str] = field(default_factory=list)
@@ -42,14 +43,17 @@ class PlanStep:
     @property
     def is_terminal(self) -> bool:
         return self.status in (
-            StepStatus.COMPLETED, StepStatus.FAILED,
-            StepStatus.SKIPPED, StepStatus.BLOCKED,
+            StepStatus.COMPLETED,
+            StepStatus.FAILED,
+            StepStatus.SKIPPED,
+            StepStatus.BLOCKED,
         )
 
 
 @dataclass
 class IncrementalPlan:
     """Structured modification plan produced by IncrementalPlanner."""
+
     goal: str
     understanding: str
     approach: str
@@ -77,19 +81,16 @@ class IncrementalPlan:
         done = len(self.completed_steps())
         failed = len(self.failed_steps())
         pending = len(self.pending_steps())
-        return (
-            f"Plan: {done}/{total} completed, "
-            f"{failed} failed, {pending} pending"
-        )
+        return f"Plan: {done}/{total} completed, {failed} failed, {pending} pending"
 
     def format_for_display(self) -> str:
         STATUS_ICON = {
-            StepStatus.PENDING:     "○",
+            StepStatus.PENDING: "○",
             StepStatus.IN_PROGRESS: "◉",
-            StepStatus.COMPLETED:   "✓",
-            StepStatus.FAILED:      "✗",
-            StepStatus.SKIPPED:     "–",
-            StepStatus.BLOCKED:     "⊘",
+            StepStatus.COMPLETED: "✓",
+            StepStatus.FAILED: "✗",
+            StepStatus.SKIPPED: "–",
+            StepStatus.BLOCKED: "⊘",
         }
         lines = [
             f"### Plan: {self.goal}",
@@ -116,6 +117,7 @@ class IncrementalPlan:
 @dataclass
 class VerificationResult:
     """Outcome of a verification run (test/lint/build command)."""
+
     passed: bool
     command: str
     exit_code: int
@@ -147,6 +149,7 @@ class VerificationResult:
 @dataclass
 class ReviewResult:
     """Outcome of a reviewer pass comparing diff vs. original intent."""
+
     approved: bool
     summary: str
     concerns: List[str] = field(default_factory=list)
@@ -169,6 +172,7 @@ class ReviewResult:
 @dataclass
 class PipelineOutcome:
     """Top-level result of a completed MODIFY pipeline run."""
+
     success: bool
     plan: IncrementalPlan
     verification: Optional[VerificationResult] = None

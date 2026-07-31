@@ -54,6 +54,7 @@ RULES:
 
 class PlannerError(Exception):
     """Raised when the planner cannot produce a valid plan."""
+
     pass
 
 
@@ -87,42 +88,36 @@ class IncrementalPlanner:
                 last_error = exc
                 if attempt == 1:
                     messages.append({"role": "assistant", "content": raw})
-                    messages.append({
-                        "role": "user",
-                        "content": f"Your response was not a valid JSON plan. Error: {exc}. Please output ONLY the valid JSON plan matching the requested schema.",
-                    })
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": f"Your response was not a valid JSON plan. Error: {exc}. Please output ONLY the valid JSON plan matching the requested schema.",
+                        }
+                    )
                 continue
 
-        raise PlannerError(
-            f"Planner failed after retries. Last error: {last_error}"
-        )
+        raise PlannerError(f"Planner failed after retries. Last error: {last_error}")
 
     def _parse_plan(self, raw: str, model_used: str = "") -> IncrementalPlan:
         # Strip thinking blocks first
         cleaned = re.sub(r"<think>[\s\S]*?</think>", "", raw).strip()
-        
+
         fence_match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", cleaned, re.I)
         if fence_match:
             cleaned = fence_match.group(1).strip()
 
         obj_match = re.search(r"\{[\s\S]+\}", cleaned)
         if not obj_match:
-            raise PlannerError(
-                f"LLM response contains no JSON object.\nResponse: {raw[:500]}"
-            )
+            raise PlannerError(f"LLM response contains no JSON object.\nResponse: {raw[:500]}")
 
         try:
             data: Dict[str, Any] = json.loads(obj_match.group())
         except json.JSONDecodeError as exc:
-            raise PlannerError(
-                f"Failed to parse plan JSON: {exc}\nRaw: {raw[:500]}"
-            ) from exc
+            raise PlannerError(f"Failed to parse plan JSON: {exc}\nRaw: {raw[:500]}") from exc
 
         for required in ("goal", "steps"):
             if required not in data:
-                raise PlannerError(
-                    f"Plan JSON missing required field '{required}'.\nData: {data}"
-                )
+                raise PlannerError(f"Plan JSON missing required field '{required}'.\nData: {data}")
 
         raw_steps = data.get("steps", [])
         if not isinstance(raw_steps, list) or not raw_steps:
@@ -132,14 +127,13 @@ class IncrementalPlanner:
         for i, s in enumerate(raw_steps[:12]):
             if not isinstance(s, dict):
                 continue
-            steps.append(PlanStep(
-                id=int(s.get("id", i + 1)),
-                description=str(s.get("description", f"Step {i + 1}")),
-                target_files=[
-                    str(f) for f in s.get("target_files", [])
-                    if isinstance(f, str)
-                ],
-            ))
+            steps.append(
+                PlanStep(
+                    id=int(s.get("id", i + 1)),
+                    description=str(s.get("description", f"Step {i + 1}")),
+                    target_files=[str(f) for f in s.get("target_files", []) if isinstance(f, str)],
+                )
+            )
 
         if not steps:
             raise PlannerError("No valid steps could be parsed from the plan.")
@@ -148,19 +142,10 @@ class IncrementalPlanner:
             goal=str(data.get("goal", "Unknown goal")),
             understanding=str(data.get("understanding", "")),
             approach=str(data.get("approach", "")),
-            affected_files=[
-                str(f) for f in data.get("affected_files", [])
-                if isinstance(f, str)
-            ],
+            affected_files=[str(f) for f in data.get("affected_files", []) if isinstance(f, str)],
             steps=steps,
-            validation_commands=[
-                str(c) for c in data.get("validation_commands", [])
-                if isinstance(c, str)
-            ],
-            risks=[
-                str(r) for r in data.get("risks", [])
-                if isinstance(r, str)
-            ],
+            validation_commands=[str(c) for c in data.get("validation_commands", []) if isinstance(c, str)],
+            risks=[str(r) for r in data.get("risks", []) if isinstance(r, str)],
             created_at=datetime.now().isoformat(),
             model_used=model_used,
         )

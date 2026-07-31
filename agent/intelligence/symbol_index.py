@@ -8,7 +8,7 @@ import ast
 import os
 import re
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List
 
 from ..config import AgentConfig
 from .context import SymbolInfo, SymbolKind
@@ -18,12 +18,10 @@ class SymbolExtractor(ABC):
     """Abstract base for language-specific symbol extractors."""
 
     @abstractmethod
-    def can_handle(self, file_path: str) -> bool:
-        ...
+    def can_handle(self, file_path: str) -> bool: ...
 
     @abstractmethod
-    def extract(self, file_path: str, content: str) -> List[SymbolInfo]:
-        ...
+    def extract(self, file_path: str, content: str) -> List[SymbolInfo]: ...
 
 
 class PythonExtractor(SymbolExtractor):
@@ -41,27 +39,31 @@ class PythonExtractor(SymbolExtractor):
 
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
-                symbols.append(SymbolInfo(
-                    name=node.name,
-                    kind=SymbolKind.CLASS,
-                    file=file_path,
-                    line=node.lineno,
-                    signature=f"class {node.name}",
-                    docstring=ast.get_docstring(node) or "",
-                    is_exported=not node.name.startswith("_"),
-                ))
+                symbols.append(
+                    SymbolInfo(
+                        name=node.name,
+                        kind=SymbolKind.CLASS,
+                        file=file_path,
+                        line=node.lineno,
+                        signature=f"class {node.name}",
+                        docstring=ast.get_docstring(node) or "",
+                        is_exported=not node.name.startswith("_"),
+                    )
+                )
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 kind = self._classify_function(node, tree)
                 sig = self._build_signature(node)
-                symbols.append(SymbolInfo(
-                    name=node.name,
-                    kind=kind,
-                    file=file_path,
-                    line=node.lineno,
-                    signature=sig,
-                    docstring=ast.get_docstring(node) or "",
-                    is_exported=not node.name.startswith("_"),
-                ))
+                symbols.append(
+                    SymbolInfo(
+                        name=node.name,
+                        kind=kind,
+                        file=file_path,
+                        line=node.lineno,
+                        signature=sig,
+                        docstring=ast.get_docstring(node) or "",
+                        is_exported=not node.name.startswith("_"),
+                    )
+                )
         return symbols
 
     def _classify_function(self, node: ast.FunctionDef, tree: ast.AST) -> SymbolKind:
@@ -91,10 +93,7 @@ class JSFallbackExtractor(SymbolExtractor):
     ]
 
     def __init__(self) -> None:
-        self._compiled = [
-            (re.compile(pat), kind, group)
-            for pat, kind, group in self._RAW_PATTERNS
-        ]
+        self._compiled = [(re.compile(pat), kind, group) for pat, kind, group in self._RAW_PATTERNS]
 
     def can_handle(self, file_path: str) -> bool:
         return file_path.endswith((".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"))
@@ -110,14 +109,16 @@ class JSFallbackExtractor(SymbolExtractor):
                 m = pattern.search(line)
                 if m:
                     name = m.group(group)
-                    symbols.append(SymbolInfo(
-                        name=name,
-                        kind=kind,
-                        file=file_path,
-                        line=i,
-                        signature=stripped[:120],
-                        is_exported=("export" in line or "module.exports" in line or "exports." in line),
-                    ))
+                    symbols.append(
+                        SymbolInfo(
+                            name=name,
+                            kind=kind,
+                            file=file_path,
+                            line=i,
+                            signature=stripped[:120],
+                            is_exported=("export" in line or "module.exports" in line or "exports." in line),
+                        )
+                    )
                     break
         return symbols
 

@@ -6,13 +6,13 @@ Guarantees path traversal prevention and command allow-list enforcement.
 """
 
 import os
-import shlex
-from typing import Tuple
+
 from ..config import AgentConfig
 
 
 class SecurityError(Exception):
     """Exception raised when a tool call violates security parameters."""
+
     pass
 
 
@@ -25,12 +25,12 @@ class ToolSafetyGuard:
     def resolve_and_validate_path(self, repo_root: str, relative_path: str) -> str:
         """
         Resolves relative path and verifies it strictly stays within the repo_root boundary.
-        
+
         Raises:
             SecurityError if path escapes repo root or targets ignored directory.
         """
         abs_root = os.path.abspath(repo_root)
-        
+
         # Clean relative path
         clean_path = relative_path.lstrip("/").lstrip("\\")
         target_path = os.path.abspath(os.path.join(abs_root, clean_path))
@@ -58,7 +58,7 @@ class ToolSafetyGuard:
     def validate_command(self, command: str) -> None:
         """
         Validates shell command against allow-listed commands or prefixes.
-        
+
         Raises:
             SecurityError if command is forbidden or destructive.
         """

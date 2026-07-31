@@ -4,7 +4,6 @@ EditLog — typed, per-file log of all modifications made in a session.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -39,6 +38,7 @@ class EditLog:
         description: str = "",
     ) -> EditEntry:
         from .snapshot import FileSnapshot
+
         norm = path.replace("\\", "/")
 
         store_old = "" if norm in self._first_edit_recorded else old_content

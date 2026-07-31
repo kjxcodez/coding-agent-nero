@@ -37,7 +37,7 @@ class PipelineOrchestrator:
         self._tools = tool_registry
         self._logger = logger
 
-        self._planner  = IncrementalPlanner(router)
+        self._planner = IncrementalPlanner(router)
         self._executor = ToolLoopExecutor(
             router=router,
             tool_registry=tool_registry,
@@ -45,7 +45,7 @@ class PipelineOrchestrator:
             max_iterations=config.max_iterations,
         )
         self._verifier = VerificationEngine(config, logger)
-        self._repair   = RepairController(
+        self._repair = RepairController(
             executor=self._executor,
             verifier=self._verifier,
             logger=logger,
@@ -107,9 +107,7 @@ class PipelineOrchestrator:
                     commands=[],
                 )
             elif self._config.verifier_command:
-                self._logger.progress(
-                    f"Using CLI-supplied verifier command: {self._config.verifier_command}"
-                )
+                self._logger.progress(f"Using CLI-supplied verifier command: {self._config.verifier_command}")
                 verification = self._verifier.verify(
                     repo_path=repo_path,
                     commands=[self._config.verifier_command],
@@ -124,8 +122,7 @@ class PipelineOrchestrator:
             repair_history = []
             if not verification.passed:
                 self._logger.warning(
-                    f"Verification failed (exit code {verification.exit_code}). "
-                    f"Starting repair loop..."
+                    f"Verification failed (exit code {verification.exit_code}). Starting repair loop..."
                 )
                 verification, repair_attempts, repair_history = self._repair.repair(
                     plan=plan,
@@ -153,8 +150,7 @@ class PipelineOrchestrator:
         plan_fully_executed = len(pending_steps) == 0
         if not plan_fully_executed:
             self._logger.warning(
-                f"Pipeline completed with {len(pending_steps)} pending steps. "
-                "Marking task as incomplete."
+                f"Pipeline completed with {len(pending_steps)} pending steps. Marking task as incomplete."
             )
 
         outcome = PipelineOutcome(
@@ -179,10 +175,9 @@ class PipelineOrchestrator:
 
     def _ask_confirmation(self, plan: IncrementalPlan) -> bool:
         try:
-            answer = input(
-                f"\n{len(plan.steps)} steps · {len(plan.affected_files)} files · "
-                "Proceed? [y/N] "
-            ).strip().lower()
+            answer = (
+                input(f"\n{len(plan.steps)} steps · {len(plan.affected_files)} files · Proceed? [y/N] ").strip().lower()
+            )
             return answer in ("y", "yes")
         except (EOFError, KeyboardInterrupt):
             return False
@@ -221,7 +216,9 @@ class PipelineOrchestrator:
     ) -> PipelineOutcome:
         if plan is None:
             from datetime import datetime
+
             from .models import PlanStep
+
             plan = IncrementalPlan(
                 goal=user_request[:100],
                 understanding="",

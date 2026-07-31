@@ -4,9 +4,10 @@ Git inspection tools for viewing active diffs and repository status.
 
 import subprocess
 from typing import Any, Dict, Optional
-from .base import BaseTool, ToolError
-from .safety import ToolSafetyGuard
+
 from ..config import AgentConfig
+from .base import BaseTool
+from .safety import ToolSafetyGuard
 
 
 class GitDiffTool(BaseTool):

@@ -1,14 +1,15 @@
 """
 Repository Intelligence Package.
 """
-from .scanner import RepositoryScanner
+
 from .context import (
-    RepositoryContext,
     ArchitectureMap,
+    RepositoryContext,
     RouteDefinition,
     SymbolInfo,
     SymbolKind,
 )
+from .scanner import RepositoryScanner
 
 __all__ = [
     "RepositoryScanner",

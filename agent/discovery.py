@@ -2,7 +2,6 @@
 Deprecated compatibility shim.
 """
 
-import warnings
 from .config import AgentConfig
 from .intelligence.context import RepositoryContext
 from .intelligence.scanner import RepositoryScanner

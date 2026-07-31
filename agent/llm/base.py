@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class ToolCall:
     """Standardized representation of an LLM tool call."""
+
     id: str
     name: str
     arguments: Dict[str, Any]
@@ -18,6 +19,7 @@ class ToolCall:
 @dataclass
 class LLMResponse:
     """Standardized LLM completion response."""
+
     content: Optional[str]
     tool_calls: List[ToolCall] = field(default_factory=list)
     model_used: str = "unknown"
