@@ -155,6 +155,14 @@ class AgentConfig:
         "go run",
         "go build",
         "cargo run",
+        "cargo build",
+        "dotnet test",
+        "dotnet build",
+        "mvn compile",
+        "gradle compileJava",
+        "php -l",
+        "ruby -c",
+        "python -m compileall",
     )
 
     @classmethod
