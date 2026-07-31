@@ -661,7 +661,29 @@ class AnthropicProvider(LLMProvider):
                     })
 
         system_str = "\n\n".join(system_prompts) if system_prompts else None
-        
+
+        # --- Merge consecutive same-role messages to satisfy Anthropic's strict
+        # alternating role requirement. When the LLM calls multiple tools in one
+        # turn, each tool result is appended as a separate "user" message in the
+        # OpenAI format. The translation loop above produces one {"role": "user"}
+        # per tool result. Anthropic rejects two consecutive "user" messages with
+        # a 400 Bad Request. We merge them here by concatenating their content
+        # lists before sending.
+        merged: List[Dict[str, Any]] = []
+        for msg in anthropic_messages:
+            if (
+                merged
+                and merged[-1]["role"] == msg["role"]
+                and isinstance(merged[-1]["content"], list)
+                and isinstance(msg["content"], list)
+            ):
+                # Extend the previous message's content block list in-place.
+                merged[-1]["content"].extend(msg["content"])
+            else:
+                # Deep-copy to avoid mutating the original list objects.
+                merged.append({"role": msg["role"], "content": msg["content"]})
+        anthropic_messages = merged
+
         # Format tools if provided
         anth_tools = self._convert_tools(tools) if tools else None
 
