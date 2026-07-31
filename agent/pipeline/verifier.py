@@ -75,7 +75,7 @@ class VerificationEngine:
 
         if any(f in files for f in ("package.json", "yarn.lock", "pnpm-lock.yaml", "package-lock.json", "bun.lockb")):
             return "node"
-        if any(f in files for f in ("requirements.txt", "pyproject.toml", "poetry.lock", "Pipfile", "setup.py", "setup.cfg")):
+        if any(f in files for f in ("requirements.txt", "pyproject.toml", "poetry.lock", "Pipfile", "setup.py", "setup.cfg", "pytest.ini")):
             return "python"
         if "go.mod" in files:
             return "go"
