@@ -95,10 +95,30 @@ class PipelineOrchestrator:
 
         # ── Stage 3: Verify ──────────────────────────────────────────────
         with self._logger.status("Phase 3/4: Verifying..."):
-            verification = self._verifier.verify(
-                repo_path=repo_path,
-                commands=plan.validation_commands or None,
-            )
+            # Resolve the verification command list in priority order:
+            #   1. skip_verification flag → skip entirely
+            #   2. config.verifier_command (from --verifier-command CLI flag)
+            #   3. plan.validation_commands (from planner output)
+            #   4. auto-detect (VerificationEngine default)
+            if self._config.skip_verification:
+                self._logger.warning("Verification skipped (--skip-tests flag).")
+                verification = self._verifier.verify(
+                    repo_path=repo_path,
+                    commands=[],
+                )
+            elif self._config.verifier_command:
+                self._logger.progress(
+                    f"Using CLI-supplied verifier command: {self._config.verifier_command}"
+                )
+                verification = self._verifier.verify(
+                    repo_path=repo_path,
+                    commands=[self._config.verifier_command],
+                )
+            else:
+                verification = self._verifier.verify(
+                    repo_path=repo_path,
+                    commands=plan.validation_commands or None,
+                )
 
             repair_attempts = 0
             repair_history = []
