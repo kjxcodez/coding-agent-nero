@@ -199,6 +199,43 @@ def merge_system_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
     return other_messages
 
 
+def format_tool_messages_as_text(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Converts past assistant tool_calls and tool responses into plain-text assistant/user messages
+    to ensure full compatibility with models/providers (like OpenRouter free models) that do
+    not support structured tool call history.
+    """
+    new_messages = []
+    for msg in messages:
+        m = dict(msg)
+        role = m.get("role")
+        if role == "assistant" and m.get("tool_calls"):
+            calls_text = []
+            for tc in m["tool_calls"]:
+                if isinstance(tc, dict):
+                    func = tc.get("function", {})
+                    name = func.get("name")
+                    args = func.get("arguments")
+                else:
+                    func = getattr(tc, "function", None)
+                    name = getattr(func, "name", None) if func else None
+                    args = getattr(func, "arguments", None) if func else None
+                calls_text.append(f"Tool Call: {name}({args})")
+
+            content = m.get("content") or ""
+            if content:
+                content += "\n\n"
+            content += "\n".join(calls_text)
+            new_messages.append({"role": "assistant", "content": content})
+        elif role == "tool":
+            tool_name = m.get("name")
+            tool_content = m.get("content")
+            new_messages.append({"role": "user", "content": f"Tool '{tool_name}' returned:\n{tool_content}"})
+        else:
+            new_messages.append(m)
+    return new_messages
+
+
 class OpenAIProvider(LLMProvider):
     """Direct adapter for native OpenAI API endpoint."""
 
@@ -288,7 +325,8 @@ class OpenRouterProvider(LLMProvider):
         # e.g. "openrouter/free", "openrouter/auto" → sent unchanged to the API
         suffix = model[len("openrouter/") :] if model.startswith("openrouter/") else model
         clean_model = suffix if "/" in suffix else model
-        merged_messages = merge_system_messages(messages)
+        formatted_messages = format_tool_messages_as_text(messages)
+        merged_messages = merge_system_messages(formatted_messages)
         kwargs: Dict[str, Any] = {
             "model": clean_model,
             "messages": merged_messages,
