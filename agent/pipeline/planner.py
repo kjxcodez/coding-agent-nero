@@ -98,7 +98,9 @@ class IncrementalPlanner:
         )
 
     def _parse_plan(self, raw: str, model_used: str = "") -> IncrementalPlan:
-        cleaned = raw.strip()
+        # Strip thinking blocks first
+        cleaned = re.sub(r"<think>[\s\S]*?</think>", "", raw).strip()
+        
         fence_match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", cleaned, re.I)
         if fence_match:
             cleaned = fence_match.group(1).strip()

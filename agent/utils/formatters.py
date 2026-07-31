@@ -20,6 +20,7 @@ def strip_code_fences(text: str) -> str:
 
 
 def parse_json_safely(text: str) -> Dict[str, Any]:
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
     cleaned = strip_code_fences(text)
     try:
         return json.loads(cleaned)

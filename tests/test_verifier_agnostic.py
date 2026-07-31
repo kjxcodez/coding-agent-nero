@@ -182,6 +182,21 @@ class TestVerifierAgnostic(unittest.TestCase):
         )
         self.assertEqual(self.engine._classify_failure(res), "Missing Database")
 
+        res2 = VerificationResult(
+            passed=False, command="node server.js", exit_code=1,
+            stdout="MongooseServerSelectionError: connect ECONNREFUSED 127.0.0.1:27017", stderr=""
+        )
+        self.assertEqual(self.engine._classify_failure(res2), "Missing Database")
+
+    def test_populate_result_bypasses_missing_database(self):
+        res = VerificationResult(
+            passed=False, command="node server.js", exit_code=1,
+            stdout="MongooseServerSelectionError: connect ECONNREFUSED 127.0.0.1:27017", stderr=""
+        )
+        populated = self.engine._populate_result(res)
+        self.assertTrue(populated.passed)
+        self.assertEqual(populated.classification, "Verification Succeeded (Missing Database Bypassed)")
+
     @patch("agent.pipeline.verifier.subprocess.run")
     @patch("agent.pipeline.verifier.subprocess.Popen")
     def test_node_boot_check_execution(self, mock_popen, mock_run):

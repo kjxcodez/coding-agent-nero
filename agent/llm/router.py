@@ -107,6 +107,28 @@ class ModelRouter:
                 last_error = exc
                 continue
 
+        # If it failed with tools, retry without tools before raising error
+        if tools:
+            _log.warning("All models failed with tools. Retrying without tools as fallback.")
+            for model in models:
+                try:
+                    provider = self._get_provider_for_model(model)
+                    response = provider.generate(
+                        model=model,
+                        messages=messages,
+                        temperature=self.config.temperature,
+                        tools=None,
+                        tool_choice=None,
+                        stream=stream,
+                    )
+                    return response
+                except Exception as exc:
+                    _log.warning(
+                        "Model '%s' failed on fallback without tools: %s", model, exc
+                    )
+                    last_error = exc
+                    continue
+
         raise RuntimeError(
             f"All models failed for role '{role}': {models}. Last error: {last_error}"
         )

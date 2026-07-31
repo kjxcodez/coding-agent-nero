@@ -89,6 +89,7 @@ _RULES: List[Tuple[re.Pattern, Intent]] = [
 
     # --- Verification / test -------------------------------------------
     (re.compile(r"\b(run|execute) (the )?(tests?|specs?|unit tests?|integration tests?|test suite)\b", re.I), Intent.VERIFY),
+    (re.compile(r"\b(run|start|execute|launch|boot) (the )?(server|app|application|service|script|command|binary|executable)\b", re.I), Intent.VERIFY),
     (re.compile(r"\b(verify|validate|check) (the )?(build|code|implementation|changes)\b", re.I), Intent.VERIFY),
     (re.compile(r"\bnpm test\b|\bpytest\b|\bmocha\b|\bjest\b|\bvitest\b", re.I), Intent.VERIFY),
     (re.compile(r"\bdoes (the )?(build|code|app|project) (compile|work|pass|run)\b", re.I), Intent.VERIFY),
