@@ -26,13 +26,18 @@ def ensure_nero_dirs():
     for d in [NERO_DIR, LOGS_DIR, SESSIONS_DIR, CACHE_DIR]:
         os.makedirs(d, exist_ok=True)
 
+class ConfigValidationError(ValueError):
+    """Raised when configuration fields fail validation checks."""
+    pass
+
+
 # Default configuration settings
 DEFAULT_SETTINGS = {
-    "planner_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini", "openrouter/google/gemma-4-31b-it:free", "openrouter/free"],
-    "coder_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest", "openrouter/poolside/laguna-s-2.1:free", "openrouter/free"],
-    "verifier_models": ["google/gemini-3.5-flash-lite", "google/gemini-3.5-flash", "google/gemini-3.1-flash-lite", "openai/gpt-4o-mini", "openrouter/free"],
-    "reviewer_models": ["google/gemini-3.5-flash", "google/gemini-3.6-flash", "google/gemini-3-flash-preview", "openai/gpt-4o-mini", "openrouter/free"],
-    "summary_models": ["google/gemini-3.5-flash-lite", "google/gemini-3.5-flash", "openai/gpt-4o-mini", "openrouter/free"],
+    "planner_models": ["google/gemini-2.5-flash", "google/gemini-2.5-pro", "openai/gpt-4o-mini", "anthropic/claude-3-5-haiku-latest", "openrouter/free"],
+    "coder_models": ["google/gemini-2.5-flash", "google/gemini-2.5-pro", "openai/gpt-4o", "anthropic/claude-3-5-sonnet-latest", "openrouter/free"],
+    "verifier_models": ["google/gemini-2.5-flash", "openai/gpt-4o-mini", "openrouter/free"],
+    "reviewer_models": ["google/gemini-2.5-flash", "openai/gpt-4o-mini", "openrouter/free"],
+    "summary_models": ["google/gemini-2.5-flash", "openai/gpt-4o-mini", "openrouter/free"],
     "repo_path": "./target_repo",
     "max_iterations": 15,
     "max_repair_attempts": 3,
@@ -164,6 +169,47 @@ class AgentConfig:
         "ruby -c",
         "python -m compileall",
     )
+
+    def validate(self) -> None:
+        """Validates configuration parameters and raises ConfigValidationError on failure."""
+        if not isinstance(self.planner_models, list) or not all(isinstance(m, str) and m for m in self.planner_models):
+            raise ConfigValidationError("planner_models must be a list of non-empty strings.")
+        if not isinstance(self.coder_models, list) or not all(isinstance(m, str) and m for m in self.coder_models):
+            raise ConfigValidationError("coder_models must be a list of non-empty strings.")
+        if not isinstance(self.verifier_models, list) or not all(isinstance(m, str) and m for m in self.verifier_models):
+            raise ConfigValidationError("verifier_models must be a list of non-empty strings.")
+        if not isinstance(self.reviewer_models, list) or not all(isinstance(m, str) and m for m in self.reviewer_models):
+            raise ConfigValidationError("reviewer_models must be a list of non-empty strings.")
+        if not isinstance(self.summary_models, list) or not all(isinstance(m, str) and m for m in self.summary_models):
+            raise ConfigValidationError("summary_models must be a list of non-empty strings.")
+
+        if not isinstance(self.repo_path, str) or not self.repo_path.strip():
+            raise ConfigValidationError("repo_path must be a non-empty string.")
+
+        if not isinstance(self.max_iterations, int) or self.max_iterations <= 0:
+            raise ConfigValidationError(f"max_iterations must be a positive integer (got {self.max_iterations}).")
+        if self.max_iterations > 100:
+            raise ConfigValidationError(f"max_iterations is capped at 100 to prevent infinite loops (got {self.max_iterations}).")
+
+        if not isinstance(self.max_repair_attempts, int) or self.max_repair_attempts < 0:
+            raise ConfigValidationError(f"max_repair_attempts must be a non-negative integer (got {self.max_repair_attempts}).")
+        if self.max_repair_attempts > 20:
+            raise ConfigValidationError(f"max_repair_attempts is capped at 20 (got {self.max_repair_attempts}).")
+
+        if not isinstance(self.temperature, (int, float)) or not (0.0 <= self.temperature <= 2.0):
+            raise ConfigValidationError(f"temperature must be a float between 0.0 and 2.0 (got {self.temperature}).")
+
+        if not isinstance(self.verbose, bool):
+            raise ConfigValidationError(f"verbose must be a boolean (got {self.verbose}).")
+
+        if not isinstance(self.verifier_command, str):
+            raise ConfigValidationError("verifier_command must be a string.")
+
+        if not isinstance(self.skip_verification, bool):
+            raise ConfigValidationError(f"skip_verification must be a boolean (got {self.skip_verification}).")
+
+    def __post_init__(self) -> None:
+        self.validate()
 
     @classmethod
     def with_single_model(cls, model: str, **kwargs) -> "AgentConfig":
