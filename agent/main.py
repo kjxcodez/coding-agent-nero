@@ -48,6 +48,8 @@ def build_config(
     max_iterations: int = 15,
     max_repair_attempts: int = 3,
     dest: str = "./target_repo",
+    verifier_command: Optional[str] = None,
+    skip_verification: bool = False,
 ) -> AgentConfig:
     if model:
         config = AgentConfig.with_single_model(model)
@@ -67,6 +69,9 @@ def build_config(
     config.max_iterations = max_iterations
     config.max_repair_attempts = max_repair_attempts
     config.repo_path = dest
+    if verifier_command:
+        config.verifier_command = verifier_command
+    config.skip_verification = skip_verification
     return config
 
 
@@ -94,9 +99,19 @@ def show_help_panel():
     console.print(Panel(help_text, title="[bold cyan]NERO Help[/bold cyan]", border_style="cyan"))
 
 
+def _is_git_url(s: str) -> bool:
+    """Returns True if the string looks like a remote Git URL."""
+    return (
+        s.startswith("http://")
+        or s.startswith("https://")
+        or s.startswith("git@")
+        or s.endswith(".git")
+    )
+
+
 def start_repl_session(
     initial_request: Optional[str] = None,
-    initial_repo: str = DEFAULT_REPO_URL,
+    initial_repo: Optional[str] = None,
     initial_dest: Optional[str] = None,
     config: Optional[AgentConfig] = None,
 ):
@@ -108,12 +123,31 @@ def start_repl_session(
     logger = AgentLogger(verbose=True)
     logger.print_ascii_art()
 
-    # Resolve workspace: prefer explicit arg, otherwise use cwd
+    # --- Workspace resolution ---
+    # Priority:
+    #   1. If initial_repo is a Git URL → clone it into initial_dest (or ./target_repos/<name>)
+    #   2. If initial_dest is provided → use it as the workspace path
+    #   3. Otherwise → use the current working directory
     cwd = os.getcwd()
-    if initial_dest is None:
-        workspace = cwd
-    else:
+
+    if initial_repo and _is_git_url(initial_repo):
+        # Clone the remote repository and use the cloned path as the workspace.
+        # Use initial_dest as the clone destination when provided.
+        dest_for_clone = os.path.abspath(initial_dest) if initial_dest else None
+        current_config = config or build_config(dest=dest_for_clone or cwd)
+        from .repo import RepositoryManager
+        repo_mgr = RepositoryManager(current_config)
+        try:
+            logger.progress(f"Cloning repository: {initial_repo} ...")
+            workspace = repo_mgr.prepare_repository(initial_repo, dest_for_clone)
+            logger.success(f"Repository ready at: {workspace}")
+        except Exception as clone_err:
+            logger.error(f"Failed to clone repository: {clone_err}")
+            workspace = dest_for_clone or cwd
+    elif initial_dest is not None:
         workspace = os.path.abspath(initial_dest)
+    else:
+        workspace = cwd
 
     current_config = config or build_config(dest=workspace)
     current_config.repo_path = workspace
@@ -349,7 +383,22 @@ def start_repl_session(
                             border_style="cyan"
                         ))
                         continue
-                    resolved = os.path.abspath(arg) if not arg.startswith("http") else arg
+                    if _is_git_url(arg):
+                        # Clone the remote URL and bind the workspace to the cloned path.
+                        from .repo import RepositoryManager
+                        repo_mgr = RepositoryManager(current_config)
+                        try:
+                            console.print(f"[dim]Cloning {arg} ...[/dim]")
+                            resolved = repo_mgr.prepare_repository(arg, None)
+                            console.print(f"[bold green]✓ Cloned to:[/bold green] [cyan]{resolved}[/cyan]")
+                        except Exception as clone_err:
+                            console.print(f"[bold red]Clone failed: {clone_err}[/bold red]")
+                            continue
+                    else:
+                        resolved = os.path.abspath(arg)
+                        if not os.path.isdir(resolved):
+                            console.print(f"[bold red]Directory not found: {resolved}[/bold red]")
+                            continue
                     current_config.repo_path = resolved
                     memory.repo_path = resolved
                     memory.repo_context = None
@@ -383,20 +432,42 @@ def start_repl_session(
 @app.callback(invoke_without_command=True)
 def main_menu(
     ctx: typer.Context,
+    repo: Optional[str] = typer.Argument(
+        None,
+        help="Git repo URL or local directory path. Omit to use current directory.",
+    ),
     request: Optional[str] = typer.Option(None, "--request", "-r", help="Optional initial change request."),
-    repo: str = typer.Option(DEFAULT_REPO_URL, "--repo", help="Git repo URL or local directory path."),
-    dest: Optional[str] = typer.Option(None, "--dest", "-d", help="Workspace directory. Defaults to current directory."),
+    dest: Optional[str] = typer.Option(None, "--dest", "-d", help="Workspace directory for cloning. Defaults to current directory."),
 ):
-    """Default entrypoint launching NERO REPL shell."""
+    """Default entrypoint launching NERO REPL shell.
+
+    Examples:
+        nero                                            # use current directory
+        nero https://github.com/owner/repo              # clone and use repo
+        nero --dest ./my-workspace https://github.com/owner/repo
+    """
     if ctx.invoked_subcommand is not None:
         return
 
     from .onboarding import run_onboarding_if_needed
     run_onboarding_if_needed()
 
-    resolved_dest = dest if dest is not None else os.getcwd()
-    config = build_config(dest=resolved_dest)
-    start_repl_session(initial_request=request, initial_repo=repo, initial_dest=resolved_dest, config=config)
+    # When a positional repo argument is provided and is not a URL,
+    # treat it as a local directory path (dest override).
+    resolved_dest = dest
+    resolved_repo = repo
+    if repo and not _is_git_url(repo):
+        # Treat as a local path — resolve it as the workspace dest
+        resolved_dest = os.path.abspath(repo)
+        resolved_repo = None
+
+    config = build_config(dest=resolved_dest or os.getcwd())
+    start_repl_session(
+        initial_request=request,
+        initial_repo=resolved_repo,
+        initial_dest=resolved_dest,
+        config=config,
+    )
 
 
 @app.command()
@@ -494,6 +565,8 @@ def run(
         max_iterations,
         max_repair_attempts,
         dest,
+        verifier_command=verifier_command,
+        skip_verification=skip_tests,
     )
     start_repl_session(initial_request=request, initial_repo=repo, initial_dest=dest, config=config)
 
