@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 
 class StepStatus(str, Enum):
@@ -123,6 +123,8 @@ class VerificationResult:
     stderr: str
     failed_tests: List[str] = field(default_factory=list)
     error_summary: str = ""
+    classification: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def format_for_llm(self, max_output: int = 2000) -> str:
         status = "PASSED" if self.passed else "FAILED"
@@ -131,6 +133,8 @@ class VerificationResult:
             f"Command: {self.command}",
             f"Exit code: {self.exit_code}",
         ]
+        if self.classification:
+            lines.append(f"Classification: {self.classification}")
         if self.failed_tests:
             lines.append(f"Failed tests: {', '.join(self.failed_tests[:10])}")
         combined = (self.stdout + "\n" + self.stderr).strip()
