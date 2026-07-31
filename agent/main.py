@@ -478,6 +478,7 @@ def start_repl_session(
 def version_callback(value: bool):
     if value:
         import importlib.metadata
+
         try:
             version = importlib.metadata.version("nero-agent")
         except importlib.metadata.PackageNotFoundError:
