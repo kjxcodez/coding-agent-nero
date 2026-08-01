@@ -904,7 +904,7 @@ class TestPhase5(unittest.TestCase):
         )
 
         executor._router.chat = MagicMock(
-            side_effect=[mock_response, LLMResponse(content="DONE", tool_calls=[], model_used="test_model")]
+            side_effect=[mock_response, LLMResponse(content="DONE: complete", tool_calls=[], model_used="test_model")]
         )
 
         with open(os.path.join(self.repo_path, "package.json"), "w") as f:

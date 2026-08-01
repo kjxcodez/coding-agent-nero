@@ -95,6 +95,7 @@ class ToolLoopExecutor:
         )
         # Repetition guard: track last N tool calls to detect infinite loops
         _last_calls: list = []  # stores (tool_name, args_json) tuples
+        consecutive_text_turns = 0
 
         for iteration in range(1, self._max_iter + 1):
             if current_step_idx < len(plan.steps):
@@ -107,6 +108,7 @@ class ToolLoopExecutor:
 
             content = response.content or ""
             if not response.tool_calls:
+                consecutive_text_turns += 1
                 if content.strip().startswith(self.DONE_SIGNAL):
                     completion_text = content.strip()
                     self._logger.progress("Executor: DONE signal received.")
@@ -114,17 +116,39 @@ class ToolLoopExecutor:
                     # for models that skip individual STEP N DONE signals).
                     for s in plan.steps:
                         if s.status == StepStatus.IN_PROGRESS:
+                            # Skip if this step was just started in the current iteration and model immediately exits
+                            if current_step_idx < len(plan.steps) and s == plan.steps[current_step_idx]:
+                                continue
                             s.mark_done(completion_text)
                     break
                 else:
                     # Check for individual step completion signals even in
                     # non-tool-call turns (the LLM may emit text between tools).
+                    prev_idx = current_step_idx
                     current_step_idx = self._apply_step_signals(content, plan, current_step_idx)
                     completion_text = content
                     messages.append({"role": "assistant", "content": content})
-                    if iteration > 1:
+                    if current_step_idx > prev_idx:
+                        consecutive_text_turns = 0
+                    if consecutive_text_turns >= 3:
+                        self._logger.warning("Executor: Exiting loop due to too many consecutive text-only turns.")
                         break
+                    
+                    # Append a user message to prompt the next action and maintain alternating roles
+                    if current_step_idx < len(plan.steps):
+                        next_step = plan.steps[current_step_idx]
+                        messages.append({
+                            "role": "user",
+                            "content": f"Please proceed to the next step: Step {next_step.id}. {next_step.description}"
+                        })
+                    else:
+                        messages.append({
+                            "role": "user",
+                            "content": "All steps of the plan have been executed. Please output 'DONE: <summary>' to finish."
+                        })
                     continue
+
+            consecutive_text_turns = 0
 
             # Apply per-step signals from any text content returned alongside
             # tool calls (the LLM may narrate progress mid-execution).

@@ -10,7 +10,7 @@ import shlex
 import shutil
 import subprocess
 import sys
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from ..config import AgentConfig
 from ..utils.logger import AgentLogger
@@ -23,12 +23,63 @@ class VerificationEngine:
     def __init__(self, config: AgentConfig, logger: AgentLogger) -> None:
         self._config = config
         self._logger = logger
+        self._installed_repos: Set[str] = set()
+
+    def _install_dependencies(self, repo_path: str) -> None:
+        ecosystem = self._detect_ecosystem(repo_path)
+        if not os.path.isdir(repo_path):
+            return
+        files = set(os.listdir(repo_path))
+
+        if ecosystem == "node":
+            package_manager = "npm"
+            if "pnpm-lock.yaml" in files:
+                package_manager = "pnpm"
+            elif "yarn.lock" in files:
+                package_manager = "yarn"
+            elif "bun.lockb" in files:
+                package_manager = "bun"
+
+            node_modules_path = os.path.join(repo_path, "node_modules")
+            if not os.path.isdir(node_modules_path):
+                self._logger.progress(
+                    f"node_modules not found. Installing Node dependencies using {package_manager} install..."
+                )
+                self._run_one(f"{package_manager} install", repo_path)
+
+        elif ecosystem == "python":
+            if "requirements.txt" in files:
+                self._logger.progress("requirements.txt found. Installing Python dependencies using pip install...")
+                pip_cmd = f"{sys.executable} -m pip install -r requirements.txt"
+                self._run_one(pip_cmd, repo_path)
+            elif "pyproject.toml" in files:
+                self._logger.progress("pyproject.toml found. Installing Python dependencies...")
+                pip_cmd = f"{sys.executable} -m pip install -e ."
+                self._run_one(pip_cmd, repo_path)
+
+        elif ecosystem == "php":
+            vendor_path = os.path.join(repo_path, "vendor")
+            if not os.path.isdir(vendor_path) and "composer.json" in files:
+                self._logger.progress(
+                    "vendor directory not found. Installing PHP dependencies using composer install..."
+                )
+                self._run_one("composer install", repo_path)
+
+        elif ecosystem == "ruby":
+            if "Gemfile" in files:
+                self._logger.progress("Gemfile found. Installing Ruby dependencies using bundle install...")
+                self._run_one("bundle install", repo_path)
 
     def verify(
         self,
         repo_path: str,
         commands: Optional[List[str]] = None,
     ) -> VerificationResult:
+        repo_abs = os.path.abspath(repo_path)
+        if repo_abs not in self._installed_repos:
+            self._install_dependencies(repo_abs)
+            self._installed_repos.add(repo_abs)
+
         ecosystem = self._detect_ecosystem(repo_path)
 
         # Priority 1 & 2: User override or Planner supplied commands

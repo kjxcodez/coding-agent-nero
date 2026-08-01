@@ -227,6 +227,19 @@ class TestVerifierAgnostic(unittest.TestCase):
             self.assertEqual(res.command, "node boot check")
             self.assertIn("skipped", res.stdout)
 
+    def test_install_dependencies_node(self):
+        """Verifier must call install dependencies when node_modules is missing."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "package.json"), "w") as f:
+                f.write("{}")
+
+            with patch.object(self.engine, "_run_one") as mock_run_one:
+                mock_run_one.return_value = VerificationResult(
+                    passed=True, command="npm install", exit_code=0, stdout="", stderr=""
+                )
+                self.engine._install_dependencies(tmp)
+                mock_run_one.assert_called_once_with("npm install", tmp)
+
 
 if __name__ == "__main__":
     unittest.main()
